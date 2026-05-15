@@ -38,7 +38,7 @@ class HomeScreen extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 24),
-                      Text('PongPong', style: theme.textTheme.displaySmall),
+                      Text('PhonePong', style: theme.textTheme.displaySmall),
                       const SizedBox(height: 12),
                       Text(
                         'Motion table tennis for your phone.',

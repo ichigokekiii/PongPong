@@ -1,11 +1,11 @@
 {
-    "name": "pong_pong",
-    "short_name": "pong_pong",
+    "name": "PhonePong",
+    "short_name": "PhonePong",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "PhonePong - motion table tennis game.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

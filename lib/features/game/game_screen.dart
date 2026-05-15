@@ -2,14 +2,18 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:sensors_plus/sensors_plus.dart';
 
 import '../../app/routes.dart';
+import '../../core/audio/game_audio_service.dart';
+import '../../core/sensors/motion_sensor_service.dart';
 import '../calibration/swing_profile_model.dart';
 import '../results/result_screen.dart';
 import '../scan/scanned_area_model.dart';
+import 'ball_feedback_widget.dart';
+import 'ball_model.dart';
 import 'game_models.dart';
+import 'hit_detection_service.dart';
+import 'paddle_model.dart';
 
 class GameScreenArgs {
   const GameScreenArgs({required this.playArea, required this.swingProfile});
@@ -30,12 +34,21 @@ class GameScreen extends StatefulWidget {
 class _GameScreenState extends State<GameScreen> {
   static const _matchLengthSeconds = 45;
 
+  // Services
+  late final MotionSensorService _motion;
+  final GameAudioService _audio = GameAudioService();
+  final HitDetectionService _hitDetection = const HitDetectionService();
+
+  // Timers
   Timer? _sessionTimer;
   Timer? _ballTimer;
   Timer? _resultTimer;
-  StreamSubscription<UserAccelerometerEvent>? _accelerometerSubscription;
-  StreamSubscription<GyroscopeEvent>? _gyroscopeSubscription;
 
+  // Subscriptions
+  StreamSubscription<SwingResult>? _swingSub;
+  StreamSubscription<MotionTelemetry>? _telemetrySub;
+
+  // Match state
   int _secondsRemaining = _matchLengthSeconds;
   int _score = 0;
   int _hits = 0;
@@ -44,24 +57,22 @@ class _GameScreenState extends State<GameScreen> {
   int _rally = 0;
   int _bestRally = 0;
 
-  double _ballSpeed = 1;
+  final Ball _ball = Ball();
   double _peakBallSpeed = 1;
-  double _liveAcceleration = 0;
-  double _liveGyro = 0;
 
-  BallState _ballState = BallState.far;
   GameStatus _status = GameStatus.ready;
-  BallLane _ballLane = BallLane.left;
-  bool _canSwing = false;
   bool _finished = false;
-  bool _motionAvailable = false;
   String _lastEvent = 'Ready to serve';
+  String _swingStatusText = 'Waiting for green window';
   String _motionStatus = 'Connecting motion sensors';
-  DateTime _lastDetectedSwing = DateTime.fromMillisecondsSinceEpoch(0);
+  MotionTelemetry _telemetry = MotionTelemetry.zero();
+  HitOutcome _lastOutcome = HitOutcome.noSwing;
+  SwingStrength _lastSwingStrength = SwingStrength.none;
 
   @override
   void initState() {
     super.initState();
+    _motion = MotionSensorService(profile: widget.args.swingProfile);
     _startSession();
     _initializeMotionSensors();
   }
@@ -71,110 +82,28 @@ class _GameScreenState extends State<GameScreen> {
     _sessionTimer?.cancel();
     _ballTimer?.cancel();
     _resultTimer?.cancel();
-    _accelerometerSubscription?.cancel();
-    _gyroscopeSubscription?.cancel();
+    _swingSub?.cancel();
+    _telemetrySub?.cancel();
+    _motion.dispose();
+    _audio.dispose();
     super.dispose();
   }
 
   Future<void> _initializeMotionSensors() async {
-    try {
-      _accelerometerSubscription = userAccelerometerEventStream(
-        samplingPeriod: SensorInterval.gameInterval,
-      ).listen(
-        (event) {
-          if (!mounted) {
-            return;
-          }
-
-          setState(() {
-            _liveAcceleration = _vectorMagnitude(event.x, event.y, event.z);
-          });
-
-          _maybeRegisterSensorSwing();
-        },
-        onError: _handleMotionError,
-      );
-
-      _gyroscopeSubscription = gyroscopeEventStream(
-        samplingPeriod: SensorInterval.gameInterval,
-      ).listen(
-        (event) {
-          if (!mounted) {
-            return;
-          }
-
-          setState(() {
-            _liveGyro = _vectorMagnitude(event.x, event.y, event.z);
-          });
-
-          _maybeRegisterSensorSwing();
-        },
-        onError: _handleMotionError,
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _motionAvailable = true;
-        _motionStatus = 'Live accelerometer + gyroscope feed';
-      });
-    } on MissingPluginException {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _motionStatus = 'Motion sensors are unavailable in this environment';
-      });
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _motionStatus = 'Unable to connect to motion sensors';
-      });
-    }
-  }
-
-  void _handleMotionError(Object _) {
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _motionAvailable = false;
-      _motionStatus = 'Unable to read motion sensor data';
+    _swingSub = _motion.onSwing.listen(_onSwingDetected);
+    _telemetrySub = _motion.telemetry.listen((value) {
+      if (!mounted) return;
+      setState(() => _telemetry = value);
     });
-  }
 
-  double _vectorMagnitude(double x, double y, double z) {
-    return math.sqrt((x * x) + (y * y) + (z * z));
-  }
-
-  void _maybeRegisterSensorSwing() {
-    if (!_motionAvailable || _finished || _ballState != BallState.ready) {
-      return;
+    final ok = await _motion.start();
+    if (!mounted) return;
+    setState(() {
+      _motionStatus = _motion.status;
+    });
+    if (!ok) {
+      _audio.setMuted(false);
     }
-
-    final now = DateTime.now();
-    if (now.difference(_lastDetectedSwing) < const Duration(milliseconds: 800)) {
-      return;
-    }
-
-    final accelerationThreshold = widget.args.swingProfile.hitThreshold;
-    final smashThreshold = widget.args.swingProfile.smashThreshold;
-
-    if (_liveAcceleration < accelerationThreshold || _liveGyro < 2.2) {
-      return;
-    }
-
-    _lastDetectedSwing = now;
-    _registerSwing(
-      smash: _liveAcceleration >= smashThreshold || _liveGyro >= 6,
-    );
   }
 
   void _startSession() {
@@ -184,22 +113,19 @@ class _GameScreenState extends State<GameScreen> {
         timer.cancel();
         return;
       }
-
       if (_secondsRemaining <= 1) {
         _finishGame(missed: false, event: 'Match timer expired');
         return;
       }
-
       setState(() {
         _secondsRemaining -= 1;
       });
     });
-
     _scheduleBallPhase();
   }
 
   Duration _phaseDuration(BallState state) {
-    final multiplier = 1 / _ballSpeed;
+    final multiplier = 1 / _ball.speed;
     switch (state) {
       case BallState.far:
         return Duration(
@@ -222,106 +148,137 @@ class _GameScreenState extends State<GameScreen> {
 
   void _scheduleBallPhase() {
     _ballTimer?.cancel();
-    if (_finished) {
-      return;
-    }
-
-    _ballTimer = Timer(_phaseDuration(_ballState), _advanceBallState);
+    if (_finished) return;
+    _ballTimer = Timer(_phaseDuration(_ball.state), _advanceBallState);
   }
 
   void _advanceBallState() {
-    if (!mounted || _finished) {
-      return;
-    }
+    if (!mounted || _finished) return;
 
-    switch (_ballState) {
+    switch (_ball.state) {
       case BallState.far:
         setState(() {
-          _ballState = BallState.near;
-          _ballLane =
-              BallLane.values[(_attempts + _hits + _smashes + 1) %
-                  BallLane.values.length];
-          _lastEvent = 'Ball approaching from ${_laneLabel(_ballLane)}';
+          _ball.state = BallState.near;
+          _ball.lane = BallLane.values[(_attempts + _hits + _smashes + 1) %
+              BallLane.values.length];
+          _lastEvent = 'Ball approaching from ${_laneLabel(_ball.lane)}';
+          _swingStatusText = 'Yellow · prepare to swing';
         });
+        _audio.startApproachLoop(speedMultiplier: _ball.speed);
         _scheduleBallPhase();
       case BallState.near:
         setState(() {
-          _ballState = BallState.ready;
-          _canSwing = true;
+          _ball.state = BallState.ready;
           _attempts += 1;
-          _lastEvent = 'Hit window open';
+          _lastEvent = 'Hit window OPEN — swing now!';
+          _swingStatusText = 'Green · swing now';
         });
+        _audio.startApproachLoop(speedMultiplier: _ball.speed, urgent: true);
         _scheduleBallPhase();
       case BallState.ready:
-        _finishGame(missed: true, event: 'Missed the ready window');
+        _audio.stopApproachLoop();
+        _finishGame(missed: true, event: 'No swing during the green window');
       case BallState.hit:
       case BallState.smash:
       case BallState.missed:
+        _audio.stopApproachLoop();
         setState(() {
-          _ballState = BallState.far;
+          _ball.state = BallState.far;
           _status = GameStatus.playing;
           _lastEvent = 'Return ball launched';
+          _swingStatusText = 'Red · ball is far';
         });
         _scheduleBallPhase();
     }
   }
 
-  void _registerSwing({required bool smash}) {
-    if (_finished) {
+  void _onSwingDetected(SwingResult swing) {
+    _registerSwing(swing);
+  }
+
+  void _registerSwing(SwingResult swing) {
+    if (_finished) return;
+
+    final outcome = _hitDetection.evaluate(
+      ballState: _ball.state,
+      swing: swing,
+    );
+
+    _lastOutcome = outcome;
+    _lastSwingStrength = swing.strength;
+
+    if (outcome.isMiss) {
+      _audio.stopApproachLoop();
+      _audio.playMiss();
+      _finishGame(missed: true, event: outcome.readable);
       return;
     }
 
-    if (!_canSwing || _ballState != BallState.ready) {
-      _finishGame(
-        missed: true,
-        event: 'Swing timing was outside the hit window',
-      );
-      return;
-    }
+    final isSmash = outcome == HitOutcome.smash;
 
     setState(() {
-      _canSwing = false;
       _hits += 1;
       _rally += 1;
       _bestRally = math.max(_bestRally, _rally);
-      _ballSpeed = (_ballSpeed + (smash ? 0.45 : 0.18)).clamp(1, 3.5);
-      _peakBallSpeed = math.max(_peakBallSpeed, _ballSpeed);
+      _ball.speed = (_ball.speed + (isSmash ? 0.45 : 0.18)).clamp(1, 3.5);
+      _peakBallSpeed = math.max(_peakBallSpeed, _ball.speed);
 
-      if (smash) {
+      if (isSmash) {
         _smashes += 1;
         _score += 3;
         _status = GameStatus.smash;
-        _ballState = BallState.smash;
-        _lastEvent = 'Smash connected';
+        _ball.state = BallState.smash;
+        _lastEvent = 'SMASH connected (+3)';
       } else {
         _score += 1;
         _status = GameStatus.hit;
-        _ballState = BallState.hit;
-        _lastEvent = 'Clean hit';
+        _ball.state = BallState.hit;
+        _lastEvent = 'Clean HIT (+1)';
       }
 
       if (_rally > 0 && _rally % 5 == 0) {
         _score += 2;
-        _lastEvent = 'Streak bonus activated';
+        _lastEvent = '$_lastEvent · streak bonus +2';
       }
+      _swingStatusText =
+          'Last swing: ${swing.label} · ${swing.acceleration.toStringAsFixed(1)} m/s²';
     });
+
+    _audio.stopApproachLoop();
+    if (isSmash) {
+      _audio.playSmash();
+    } else {
+      _audio.playHit();
+    }
 
     _scheduleBallPhase();
   }
 
+  // Manual override button used as a fallback when motion sensors are not
+  // available (e.g. desktop / web preview).
+  void _manualSwing({required bool smash}) {
+    final strength = smash ? SwingStrength.smash : SwingStrength.normal;
+    _registerSwing(
+      SwingResult(
+        strength: strength,
+        acceleration: smash ? 9.0 : 5.0,
+        gyro: smash ? 6.5 : 3.0,
+        timestamp: DateTime.now(),
+      ),
+    );
+  }
+
   void _finishGame({required bool missed, required String event}) {
-    if (_finished) {
-      return;
-    }
+    if (_finished) return;
 
     _sessionTimer?.cancel();
     _ballTimer?.cancel();
+    _audio.stopApproachLoop();
 
     setState(() {
       _finished = true;
-      _canSwing = false;
       _status = missed ? GameStatus.missed : GameStatus.gameOver;
-      _ballState = missed ? BallState.missed : _ballState;
+      _ball.state = missed ? BallState.missed : _ball.state;
       _lastEvent = event;
     });
 
@@ -329,10 +286,7 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _goToResults() {
-    if (!mounted) {
-      return;
-    }
-
+    if (!mounted) return;
     Navigator.pushReplacementNamed(
       context,
       AppRoutes.results,
@@ -363,33 +317,23 @@ class _GameScreenState extends State<GameScreen> {
     }
   }
 
-  Color _ballColor() {
-    switch (_ballState) {
-      case BallState.far:
-        return const Color(0xFFE76F51);
-      case BallState.near:
-        return const Color(0xFFF4A261);
-      case BallState.ready:
-        return const Color(0xFF2A9D8F);
-      case BallState.hit:
-        return const Color(0xFF3D5A80);
-      case BallState.smash:
-        return const Color(0xFFE63946);
-      case BallState.missed:
-        return const Color(0xFF7D8597);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final accuracy = _attempts == 0 ? 0.0 : _hits / _attempts;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Game Screen'),
+        title: const Text('PhonePong'),
         actions: [
+          IconButton(
+            icon: Icon(_audio.isMuted ? Icons.volume_off : Icons.volume_up),
+            tooltip: _audio.isMuted ? 'Unmute cues' : 'Mute cues',
+            onPressed: () {
+              setState(() => _audio.toggleMute());
+            },
+          ),
           Padding(
-            padding: const EdgeInsets.only(right: 24),
+            padding: const EdgeInsets.only(right: 16),
             child: Center(
               child: Text(
                 '${_secondsRemaining}s',
@@ -400,7 +344,7 @@ class _GameScreenState extends State<GameScreen> {
         ],
       ),
       body: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         child: Column(
           children: [
             Row(
@@ -408,55 +352,60 @@ class _GameScreenState extends State<GameScreen> {
                 Expanded(
                   child: _ScoreCard(label: 'Score', value: _score.toString()),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: _ScoreCard(label: 'Rally', value: _rally.toString()),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: _ScoreCard(label: 'State', value: _status.name),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
+            BallStateLegend(currentState: _ball.state),
+            const SizedBox(height: 12),
             Expanded(
               child: SingleChildScrollView(
                 child: Column(
                   children: [
-                    _FeedbackArena(
-                      color: _ballColor(),
-                      state: _ballState,
-                      lane: _ballLane,
-                      ballSpeed: _ballSpeed,
+                    BallFeedbackArena(
+                      ball: _ball,
                       lastEvent: _lastEvent,
+                      swingStatusText: _swingStatusText,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                     _IntegrationPanel(
-                      title: 'Spatial scan integration',
-                      subtitle: 'Member 2 handoff',
+                      title: 'Spatial scan (HART)',
+                      subtitle: 'Play area data wired from scan screen',
                       metrics: [
                         'Width ${widget.args.playArea.widthLabel}',
                         'Length ${widget.args.playArea.lengthLabel}',
                         'Hit zone ${widget.args.playArea.hitZone.toStringAsFixed(2)} m',
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     _IntegrationPanel(
-                      title: 'Motion paddle integration',
+                      title: 'Motion paddle (SETH)',
                       subtitle: _motionStatus,
                       metrics: [
                         'Hand ${widget.args.swingProfile.handLabel}',
-                        'Accel ${_liveAcceleration.toStringAsFixed(1)} m/s²',
-                        'Gyro ${_liveGyro.toStringAsFixed(1)} rad/s',
+                        'Accel ${_telemetry.acceleration.toStringAsFixed(1)} m/s²',
+                        'Gyro ${_telemetry.gyro.toStringAsFixed(1)} rad/s',
+                        'Last ${_lastSwingStrength.name}',
+                        'Outcome ${_lastOutcome.readable}',
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     _IntegrationPanel(
-                      title: 'Feedback system integration',
-                      subtitle: 'Member 4 handoff',
+                      title: 'Sound + light (JOHN)',
+                      subtitle: _audio.isMuted
+                          ? 'Cues muted'
+                          : 'Cues speed up with ball speed',
                       metrics: [
-                        'Ball ${_ballState.name}',
-                        'Cue speed ${_ballSpeed.toStringAsFixed(2)}x',
+                        'Ball ${_ball.state.name}',
+                        'Cue speed ${_ball.speed.toStringAsFixed(2)}x',
+                        'Blink ${_ball.blinkIntervalMs}ms',
                         'Accuracy ${(accuracy * 100).toStringAsFixed(0)}%',
                       ],
                     ),
@@ -464,23 +413,23 @@ class _GameScreenState extends State<GameScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => _registerSwing(smash: false),
+                    onPressed: () => _manualSwing(smash: false),
                     child: Text(
-                      _motionAvailable ? 'Manual Hit Override' : 'Hit Swing',
+                      _motion.isAvailable ? 'Manual Hit Override' : 'Hit Swing',
                     ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => _registerSwing(smash: true),
+                    onPressed: () => _manualSwing(smash: true),
                     child: Text(
-                      _motionAvailable
+                      _motion.isAvailable
                           ? 'Manual Smash Override'
                           : 'Smash Swing',
                     ),
@@ -509,171 +458,15 @@ class _ScoreCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(label, style: Theme.of(context).textTheme.bodyMedium),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(value, style: Theme.of(context).textTheme.titleLarge),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _FeedbackArena extends StatelessWidget {
-  const _FeedbackArena({
-    required this.color,
-    required this.state,
-    required this.lane,
-    required this.ballSpeed,
-    required this.lastEvent,
-  });
-
-  final Color color;
-  final BallState state;
-  final BallLane lane;
-  final double ballSpeed;
-  final String lastEvent;
-
-  @override
-  Widget build(BuildContext context) {
-    final edgeGlow = color.withValues(alpha: 0.75);
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 320),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [color.withValues(alpha: 0.95), color.withValues(alpha: 0.5)],
-        ),
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Ball ${state.name}',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(color: Colors.white),
-              ),
-              Text(
-                '${ballSpeed.toStringAsFixed(2)}x speed',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyLarge?.copyWith(color: Colors.white),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          SizedBox(
-            height: 220,
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(24),
-                      color: Colors.black.withValues(alpha: 0.18),
-                    ),
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.topCenter,
-                  child: _EdgePulse(
-                    active: state == BallState.far,
-                    color: edgeGlow,
-                    horizontal: true,
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.bottomCenter,
-                  child: _EdgePulse(
-                    active: state == BallState.near,
-                    color: edgeGlow,
-                    horizontal: true,
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: _EdgePulse(
-                    active: lane == BallLane.left,
-                    color: edgeGlow,
-                    horizontal: false,
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: _EdgePulse(
-                    active: lane == BallLane.right,
-                    color: edgeGlow,
-                    horizontal: false,
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.center,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 320),
-                    width: state == BallState.ready ? 116 : 88,
-                    height: state == BallState.ready ? 116 : 88,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withValues(
-                        alpha: state == BallState.ready ? 0.9 : 0.3,
-                      ),
-                    ),
-                    child: Icon(
-                      state == BallState.ready
-                          ? Icons.sports_tennis
-                          : Icons.motion_photos_on_outlined,
-                      color: state == BallState.ready ? color : Colors.white,
-                      size: 40,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            lastEvent,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyLarge?.copyWith(color: Colors.white),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EdgePulse extends StatelessWidget {
-  const _EdgePulse({
-    required this.active,
-    required this.color,
-    required this.horizontal,
-  });
-
-  final bool active;
-  final Color color;
-  final bool horizontal;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 280),
-      width: horizontal ? 170 : 14,
-      height: horizontal ? 14 : 120,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(999),
-        color: active ? color : Colors.white.withValues(alpha: 0.12),
       ),
     );
   }
@@ -694,14 +487,14 @@ class _IntegrationPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(title, style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 4),
             Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Wrap(
               spacing: 8,
               runSpacing: 8,

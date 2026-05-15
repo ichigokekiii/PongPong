@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import 'routes.dart';
 import 'theme.dart';
 
-class PongPongApp extends StatelessWidget {
-  const PongPongApp({super.key});
+class PhonePongApp extends StatelessWidget {
+  const PhonePongApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'PongPong',
+      title: 'PhonePong',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
       initialRoute: AppRoutes.home,

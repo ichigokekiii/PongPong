@@ -3,28 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../app/routes.dart';
+import 'scan_controller.dart';
 import 'scanned_area_model.dart';
-
-enum _ScanStep {
-  leftBoundary(
-    'Scan left boundary',
-    'Mark the left edge of your playable lane.',
-  ),
-  rightBoundary(
-    'Scan right boundary',
-    'Sweep to the right edge to capture width.',
-  ),
-  forwardLength('Scan forward length', 'Point forward to set the rally depth.'),
-  confirm(
-    'Confirm play area',
-    'Review the measured space before starting calibration.',
-  );
-
-  const _ScanStep(this.title, this.description);
-
-  final String title;
-  final String description;
-}
 
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
@@ -34,23 +14,27 @@ class ScanScreen extends StatefulWidget {
 }
 
 class _ScanScreenState extends State<ScanScreen> {
-  int _stepIndex = 0;
-  ScannedArea _area = ScannedArea.empty();
+  final ScanController _controller = ScanController();
   CameraController? _cameraController;
   String _cameraStatus = 'Preparing live camera preview...';
-
-  _ScanStep get _step => _ScanStep.values[_stepIndex];
 
   @override
   void initState() {
     super.initState();
+    _controller.addListener(_onControllerChanged);
     _initializeCamera();
   }
 
   @override
   void dispose() {
+    _controller.removeListener(_onControllerChanged);
+    _controller.dispose();
     _cameraController?.dispose();
     super.dispose();
+  }
+
+  void _onControllerChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _initializeCamera() async {
@@ -67,9 +51,7 @@ class _ScanScreenState extends State<ScanScreen> {
     try {
       final cameras = await availableCameras();
       if (cameras.isEmpty) {
-        if (!mounted) {
-          return;
-        }
+        if (!mounted) return;
         setState(() {
           _cameraStatus = 'No camera was found on this device.';
         });
@@ -99,9 +81,7 @@ class _ScanScreenState extends State<ScanScreen> {
         _cameraStatus = 'Live camera preview ready';
       });
     } on CameraException catch (error) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       setState(() {
         _cameraStatus = switch (error.code) {
           'CameraAccessDenied' =>
@@ -114,17 +94,12 @@ class _ScanScreenState extends State<ScanScreen> {
         };
       });
     } on MissingPluginException {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       setState(() {
-        _cameraStatus =
-            'Camera plugin is unavailable in this environment.';
+        _cameraStatus = 'Camera plugin is unavailable in this environment.';
       });
     } catch (_) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       setState(() {
         _cameraStatus = 'Unable to start the camera preview.';
       });
@@ -181,46 +156,58 @@ class _ScanScreenState extends State<ScanScreen> {
     );
   }
 
-  void _advanceScan() {
-    setState(() {
-      switch (_step) {
-        case _ScanStep.leftBoundary:
-          _area = _area.copyWith(width: 1.3);
-        case _ScanStep.rightBoundary:
-          _area = _area.copyWith(width: 2.6);
-        case _ScanStep.forwardLength:
-          _area = _area.copyWith(length: 3.2, nearZone: 1.0, hitZone: 0.55);
-        case _ScanStep.confirm:
-          Navigator.pushNamed(context, AppRoutes.calibration, arguments: _area);
-          return;
-      }
+  void _onPrimaryAction() {
+    if (_controller.step == ScanStep.confirm) {
+      Navigator.pushNamed(
+        context,
+        AppRoutes.calibration,
+        arguments: _controller.area,
+      );
+      return;
+    }
+    _controller.captureCurrentStep();
+  }
 
-      _stepIndex = (_stepIndex + 1).clamp(0, _ScanStep.values.length - 1);
-    });
+  String get _primaryButtonLabel {
+    switch (_controller.step) {
+      case ScanStep.leftBoundary:
+        return 'Capture left edge';
+      case ScanStep.rightBoundary:
+        return 'Capture right edge';
+      case ScanStep.forwardLength:
+        return 'Capture forward length';
+      case ScanStep.confirm:
+        return 'Confirm play area';
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final progress = (_stepIndex + 1) / _ScanStep.values.length;
+    final step = _controller.step;
+    final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(),
+      appBar: AppBar(
+        actions: [
+          if (_controller.stepIndex > 0)
+            TextButton(
+              onPressed: _controller.restart,
+              child: const Text('Restart scan'),
+            ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Scan your play area',
-              style: Theme.of(context).textTheme.displaySmall,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              _step.description,
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
+            Text('Scan your play area', style: theme.textTheme.displaySmall),
+            const SizedBox(height: 8),
+            Text(step.progressLabel, style: theme.textTheme.titleMedium),
+            const SizedBox(height: 6),
+            Text(step.description, style: theme.textTheme.bodyLarge),
             const SizedBox(height: 20),
-            LinearProgressIndicator(value: progress),
+            LinearProgressIndicator(value: _controller.progress),
             const SizedBox(height: 24),
             Expanded(
               child: Card(
@@ -229,44 +216,17 @@ class _ScanScreenState extends State<ScanScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        _step.title,
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
+                      Text(step.title, style: theme.textTheme.titleLarge),
+                      const SizedBox(height: 12),
+                      _ScanStepDots(currentIndex: _controller.stepIndex),
                       const SizedBox(height: 16),
                       Expanded(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(24),
-                          child: Stack(
-                            children: [
-                              Positioned.fill(child: _buildCameraSurface()),
-                              const Positioned.fill(child: _ScannerGrid()),
-                              Center(
-                                child: Container(
-                                  width: 180,
-                                  height: 220,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(28),
-                                    border: Border.all(
-                                      color: const Color(0xFFF4A261),
-                                      width: 3,
-                                    ),
-                                  ),
-                                ),
+                        child: step == ScanStep.confirm
+                            ? _PlayAreaSummary(area: _controller.area)
+                            : _ScanCameraPanel(
+                                surface: _buildCameraSurface(),
+                                statusText: _cameraStatus,
                               ),
-                              Positioned(
-                                left: 24,
-                                right: 24,
-                                bottom: 24,
-                                child: Text(
-                                  _cameraStatus,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(color: Colors.white70),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       ),
                       const SizedBox(height: 16),
                       Row(
@@ -274,14 +234,14 @@ class _ScanScreenState extends State<ScanScreen> {
                           Expanded(
                             child: _MetricTile(
                               label: 'Width',
-                              value: _area.widthLabel,
+                              value: _controller.widthLabel,
                             ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: _MetricTile(
                               label: 'Length',
-                              value: _area.lengthLabel,
+                              value: _controller.lengthLabel,
                             ),
                           ),
                         ],
@@ -293,14 +253,217 @@ class _ScanScreenState extends State<ScanScreen> {
             ),
             const SizedBox(height: 20),
             ElevatedButton(
-              onPressed: _advanceScan,
-              child: Text(
-                _step == _ScanStep.confirm
-                    ? 'Confirm play area'
-                    : 'Capture step',
-              ),
+              onPressed: _onPrimaryAction,
+              child: Text(_primaryButtonLabel),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ScanCameraPanel extends StatelessWidget {
+  const _ScanCameraPanel({required this.surface, required this.statusText});
+
+  final Widget surface;
+  final String statusText;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: Stack(
+        children: [
+          Positioned.fill(child: surface),
+          const Positioned.fill(child: _ScannerGrid()),
+          Center(
+            child: Container(
+              width: 180,
+              height: 220,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: const Color(0xFFF4A261), width: 3),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 24,
+            right: 24,
+            bottom: 24,
+            child: Text(
+              statusText,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white70),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PlayAreaSummary extends StatelessWidget {
+  const _PlayAreaSummary({required this.area});
+
+  final ScannedArea area;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFE8F4EF), Color(0xFFF8EADD)],
+        ),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.check_circle, color: Color(0xFF2A9D8F)),
+                const SizedBox(width: 8),
+                Text(
+                  'Play area ready',
+                  style: theme.textTheme.titleLarge,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _SummaryRow(label: 'Width', value: area.widthLabel),
+            _SummaryRow(label: 'Length', value: area.lengthLabel),
+            _SummaryRow(
+              label: 'Near zone',
+              value: '${area.nearZone.toStringAsFixed(2)} m',
+            ),
+            _SummaryRow(
+              label: 'Hit zone',
+              value: '${area.hitZone.toStringAsFixed(2)} m',
+            ),
+            const Spacer(),
+            const _VirtualCourtPreview(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _VirtualCourtPreview extends StatelessWidget {
+  const _VirtualCourtPreview();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 80,
+      decoration: BoxDecoration(
+        color: const Color(0xFF11212D),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      padding: const EdgeInsets.all(10),
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                border:
+                    Border.all(color: const Color(0xFFF4A261), width: 1.5),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Center(
+                child: Text(
+                  'Virtual court',
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SummaryRow extends StatelessWidget {
+  const _SummaryRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: Theme.of(context).textTheme.bodyMedium),
+          Text(
+            value,
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScanStepDots extends StatelessWidget {
+  const _ScanStepDots({required this.currentIndex});
+
+  final int currentIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        for (var i = 0; i < ScanStep.values.length; i++) ...[
+          _Dot(active: i <= currentIndex, label: '${i + 1}'),
+          if (i != ScanStep.values.length - 1)
+            Expanded(
+              child: Container(
+                height: 2,
+                color: i < currentIndex
+                    ? const Color(0xFF2A9D8F)
+                    : const Color(0xFFE0DACF),
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+class _Dot extends StatelessWidget {
+  const _Dot({required this.active, required this.label});
+
+  final bool active;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 26,
+      height: 26,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: active ? const Color(0xFF11212D) : const Color(0xFFE0DACF),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        label,
+        style: TextStyle(
+          color: active ? Colors.white : const Color(0xFF11212D),
+          fontWeight: FontWeight.w700,
+          fontSize: 12,
         ),
       ),
     );

@@ -4,7 +4,7 @@ import 'package:pong_pong/app/app.dart';
 
 void main() {
   testWidgets('start flow reaches scan setup', (WidgetTester tester) async {
-    await tester.pumpWidget(const PongPongApp());
+    await tester.pumpWidget(const PhonePongApp());
 
     expect(find.text('Motion table tennis for your phone.'), findsOneWidget);
 
