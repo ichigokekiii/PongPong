@@ -11,6 +11,7 @@ void main() {
       hostAddress: '192.168.1.2',
       port: 4242,
       token: 'TOKEN123456',
+      hostAddresses: <String>['192.168.1.2', '10.0.0.5'],
     );
 
     final decoded = PairingPayload.parse(payload.encode());
@@ -19,6 +20,7 @@ void main() {
     expect(decoded.hostAddress, payload.hostAddress);
     expect(decoded.port, payload.port);
     expect(decoded.token, payload.token);
+    expect(decoded.connectionAddresses, payload.connectionAddresses);
   });
 
   test('invalid QR payload throws format exception', () {
@@ -117,6 +119,7 @@ void main() {
         hostAddress: '127.0.0.1',
         port: 6553,
         token: 'TOKEN123456',
+        hostAddresses: <String>['127.0.0.1', '192.168.1.50'],
       ),
     );
 
@@ -125,6 +128,34 @@ void main() {
     );
 
     expect(joiner.state.errorMessage, contains('Unable to join'));
+  });
+
+  test('join falls back to the next advertised LAN address', () async {
+    final host = MultiplayerSessionController(
+      defaultBindAddress: InternetAddress.loopbackIPv4,
+      advertisedHostAddress: InternetAddress.loopbackIPv4.address,
+    );
+    final joiner = MultiplayerSessionController();
+
+    await host.hostSession();
+    await joiner.joinSession(
+      PairingPayload(
+        roomId: host.payload!.roomId,
+        hostAddress: '192.168.10.250',
+        port: host.payload!.port,
+        token: host.payload!.token,
+        hostAddresses: <String>[
+          '192.168.10.250',
+          InternetAddress.loopbackIPv4.address,
+        ],
+      ),
+    );
+
+    await _waitUntil(() => host.state.isConnected && joiner.state.isConnected);
+
+    expect(joiner.state.isConnected, isTrue);
+
+    await host.closeSession(reason: 'Test complete.');
   });
 
   test('disconnect during scan notifies the joiner', () async {

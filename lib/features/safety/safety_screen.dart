@@ -119,7 +119,7 @@ class _SafetyScreenState extends State<SafetyScreen> {
                 onPressed: _agreed
                     ? () => Navigator.pushReplacementNamed(
                           context,
-                          Routes.scan,
+                          Routes.multiplayerSetup,
                         )
                     : null,
               ),

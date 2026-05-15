@@ -21,12 +21,31 @@ class PairingPayload {
     required this.hostAddress,
     required this.port,
     required this.token,
+    this.hostAddresses = const <String>[],
   });
 
   final String roomId;
   final String hostAddress;
   final int port;
   final String token;
+  final List<String> hostAddresses;
+
+  List<String> get connectionAddresses {
+    final ordered = <String>[];
+    void addCandidate(String value) {
+      final trimmed = value.trim();
+      if (trimmed.isEmpty || ordered.contains(trimmed)) {
+        return;
+      }
+      ordered.add(trimmed);
+    }
+
+    addCandidate(hostAddress);
+    for (final address in hostAddresses) {
+      addCandidate(address);
+    }
+    return ordered;
+  }
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
@@ -34,17 +53,24 @@ class PairingPayload {
       'hostAddress': hostAddress,
       'port': port,
       'token': token,
+      'hostAddresses': connectionAddresses,
     };
   }
 
   String encode() => jsonEncode(toJson());
 
   factory PairingPayload.fromJson(Map<String, dynamic> json) {
+    final addresses = (json['hostAddresses'] as List<dynamic>? ?? const [])
+        .whereType<String>()
+        .map((address) => address.trim())
+        .where((address) => address.isNotEmpty)
+        .toList(growable: false);
     return PairingPayload(
       roomId: json['roomId'] as String? ?? '',
       hostAddress: json['hostAddress'] as String? ?? '',
       port: json['port'] as int? ?? 0,
       token: json['token'] as String? ?? '',
+      hostAddresses: addresses,
     );
   }
 

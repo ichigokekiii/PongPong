@@ -115,7 +115,7 @@ class _SettingSwitch extends StatelessWidget {
     final t = Theme.of(context).textTheme;
     return SwitchListTile(
       contentPadding: EdgeInsets.zero,
-      activeThumbColor: MarioColors.cloudWhite,
+      activeColor: MarioColors.cloudWhite,
       activeTrackColor: MarioColors.pipe,
       inactiveTrackColor: MarioColors.bowserBlack.withValues(alpha: 0.18),
       title: Text(title, style: t.titleMedium),

@@ -31,7 +31,7 @@ void main() {
     expect(find.text('MULTIPLAYER SETUP'), findsWidgets);
     expect(find.text('HOST GAME'), findsOneWidget);
     expect(find.text('JOIN GAME'), findsOneWidget);
-    expect(find.text('Shared Spatial Creation'), findsNothing);
+    expect(find.text('Shared Spatial Setup'), findsNothing);
   });
 
   testWidgets('host path shows QR and waits until joiner connects', (
@@ -62,12 +62,12 @@ void main() {
     expect(find.text('HOST GAME'), findsWidgets);
     await tester.pumpAndSettle();
     expect(find.byType(SelectableText), findsOneWidget);
-    expect(find.text('Shared Spatial Creation'), findsNothing);
+    expect(find.text('Shared Spatial Setup'), findsNothing);
 
     hostController.simulatePeerConnected();
     await tester.pumpAndSettle();
 
-    expect(find.text('Shared Spatial Creation'), findsWidgets);
+    expect(find.text('Shared Spatial Setup'), findsWidgets);
   });
 
   testWidgets('join path accepts payload and reaches mirrored shared scan', (
@@ -105,7 +105,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.pumpAndSettle();
 
-    expect(find.text('Shared Spatial Creation'), findsWidgets);
+    expect(find.text('Shared Spatial Setup'), findsWidgets);
     expect(find.text('Joiner mirrors scan'), findsOneWidget);
   });
 }

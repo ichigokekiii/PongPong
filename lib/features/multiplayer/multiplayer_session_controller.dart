@@ -50,14 +50,14 @@ class MultiplayerSessionController extends ChangeNotifier {
         shared: true,
       );
       _server = server;
-      final hostAddress = advertisedHostAddress ??
-          _advertisedHostAddress ??
-          await _resolveAdvertisedHostAddress();
+      final advertisedAddresses =
+          await _resolveAdvertisedHostAddresses(advertisedHostAddress);
       final sessionPayload = PairingPayload(
         roomId: _generateToken(length: 6).toUpperCase(),
-        hostAddress: hostAddress,
+        hostAddress: advertisedAddresses.first,
         port: server.port,
         token: _generateToken(length: 12),
+        hostAddresses: advertisedAddresses,
       );
       _serverSubscription = server.listen(_handleIncomingRequest);
       _state = _state.copyWith(
@@ -86,9 +86,7 @@ class MultiplayerSessionController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final socket = await WebSocket.connect(
-        'ws://${payload.hostAddress}:${payload.port}',
-      );
+      final socket = await _connectToPairingPayload(payload);
       await _attachSocket(socket);
       _sendMessage(<String, dynamic>{
         'type': 'join_request',
@@ -405,7 +403,39 @@ class MultiplayerSessionController extends ChangeNotifier {
     _server = null;
   }
 
-  Future<String> _resolveAdvertisedHostAddress() async {
+  Future<WebSocket> _connectToPairingPayload(PairingPayload payload) async {
+    Object? lastError;
+    for (final address in payload.connectionAddresses) {
+      try {
+        return await WebSocket.connect(
+          'ws://$address:${payload.port}',
+        ).timeout(const Duration(seconds: 3));
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw SocketException(
+      'Unable to reach host on ${payload.connectionAddresses.join(', ')}${lastError == null ? '' : ' ($lastError)'}',
+    );
+  }
+
+  Future<List<String>> _resolveAdvertisedHostAddresses(
+    String? advertisedHostAddress,
+  ) async {
+    final candidates = <String>[];
+
+    void addCandidate(String? value) {
+      final trimmed = value?.trim() ?? '';
+      if (trimmed.isEmpty || candidates.contains(trimmed)) {
+        return;
+      }
+      candidates.add(trimmed);
+    }
+
+    addCandidate(advertisedHostAddress);
+    addCandidate(_advertisedHostAddress);
+
     final interfaces = await NetworkInterface.list(
       type: InternetAddressType.IPv4,
       includeLoopback: false,
@@ -414,12 +444,13 @@ class MultiplayerSessionController extends ChangeNotifier {
     for (final interface in interfaces) {
       for (final address in interface.addresses) {
         if (_looksLikeLanAddress(address.address)) {
-          return address.address;
+          addCandidate(address.address);
         }
       }
     }
 
-    return InternetAddress.loopbackIPv4.address;
+    addCandidate(InternetAddress.loopbackIPv4.address);
+    return candidates;
   }
 
   bool _looksLikeLanAddress(String address) {
