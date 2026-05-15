@@ -33,67 +33,81 @@ class _SafetyScreenState extends State<SafetyScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SectionHeader(
-                label: 'BEFORE YOU PLAY',
-                title: 'Clear the\nbattlefield!',
-              ),
-              const SizedBox(height: MarioSpacing.md),
-              const MarioBlockCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _SafetyRow(
-                      icon: Icons.warning_amber_rounded,
-                      title: 'Open space required',
-                      body:
-                          'Stand in a room with at least 2×2 m of clear floor.',
-                    ),
-                    _SafetyRow(
-                      icon: Icons.pan_tool_rounded,
-                      title: 'Grip your phone firmly',
-                      body:
-                          'Hold it like a paddle. We strongly recommend a strap.',
-                    ),
-                    _SafetyRow(
-                      icon: Icons.pets_rounded,
-                      title: 'No people, pets, or glass',
-                      body:
-                          'Keep fragile objects and breakable surfaces far away.',
-                    ),
-                    _SafetyRow(
-                      icon: Icons.fitness_center_rounded,
-                      title: 'You will be moving',
-                      body:
-                          'Take breaks. Stop if dizzy. Stay hydrated, champion.',
-                    ),
-                  ],
+              const Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SectionHeader(
+                        label: 'BEFORE YOU PLAY',
+                        title: 'Clear the\nbattlefield!',
+                      ),
+                      SizedBox(height: MarioSpacing.md),
+                      MarioBlockCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _SafetyRow(
+                              icon: Icons.warning_amber_rounded,
+                              title: 'Open space required',
+                              body:
+                                  'Stand in a room with at least 2×2 m of clear floor.',
+                            ),
+                            _SafetyRow(
+                              icon: Icons.pan_tool_rounded,
+                              title: 'Grip your phone firmly',
+                              body:
+                                  'Hold it like a paddle. We strongly recommend a strap.',
+                            ),
+                            _SafetyRow(
+                              icon: Icons.pets_rounded,
+                              title: 'No people, pets, or glass',
+                              body:
+                                  'Keep fragile objects and breakable surfaces far away.',
+                            ),
+                            _SafetyRow(
+                              icon: Icons.fitness_center_rounded,
+                              title: 'You will be moving',
+                              body:
+                                  'Take breaks. Stop if dizzy. Stay hydrated, champion.',
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: MarioSpacing.sm),
+                    ],
+                  ),
                 ),
               ),
-              const Spacer(),
+              const SizedBox(height: MarioSpacing.sm),
               MarioBlockCard(
                 padding: const EdgeInsets.symmetric(
                   horizontal: MarioSpacing.sm,
                   vertical: MarioSpacing.xs,
                 ),
                 background: MarioColors.cloudWhite,
-                child: Row(
-                  children: [
-                    Checkbox(
-                      value: _agreed,
-                      activeColor: MarioColors.marioRed,
-                      side: const BorderSide(
-                        color: MarioColors.bowserBlack,
-                        width: 2,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(MarioRadius.md),
+                  onTap: () => setState(() => _agreed = !_agreed),
+                  child: Row(
+                    children: [
+                      Checkbox(
+                        value: _agreed,
+                        activeColor: MarioColors.marioRed,
+                        side: const BorderSide(
+                          color: MarioColors.bowserBlack,
+                          width: 2,
+                        ),
+                        onChanged: (v) => setState(() => _agreed = v ?? false),
                       ),
-                      onChanged: (v) => setState(() => _agreed = v ?? false),
-                    ),
-                    Expanded(
-                      child: Text(
-                        'I understand and my play area is safe.',
-                        style: t.bodyMedium,
+                      Expanded(
+                        child: Text(
+                          'I understand and my play area is safe.',
+                          style: t.bodyMedium,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: MarioSpacing.sm),
