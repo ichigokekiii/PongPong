@@ -6,6 +6,7 @@ import 'features/game/game_screen.dart';
 import 'features/home/home_screen.dart';
 import 'features/results/result_screen.dart';
 import 'features/safety/safety_screen.dart';
+import 'features/scan/scanned_area_model.dart';
 import 'features/scan/spatial_scan_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'theme/mario_theme.dart';
@@ -70,7 +71,8 @@ class _PhonePongAppState extends State<PhonePongApp> {
         case Routes.scan:
           return SpatialScanScreen(a11y: _a11y);
         case Routes.calibration:
-          return CalibrationScreen(a11y: _a11y);
+          final args = settings.arguments as ScannedAreaModel?;
+          return CalibrationScreen(a11y: _a11y, playArea: args);
         case Routes.game:
           return GameScreen(a11y: _a11y);
         case Routes.result:
