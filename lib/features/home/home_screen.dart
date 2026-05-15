@@ -63,7 +63,7 @@ class HomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: MarioSpacing.xs),
               Text(
-                'Phone-as-paddle table tennis.\nNo table. No ball. Just motion.',
+                'Two-phone paddle table tennis.\nHost, join, scan, then swing.',
                 style: t.bodyLarge?.copyWith(height: 1.4),
               ),
               const Spacer(),
@@ -159,14 +159,24 @@ class HomeScreen extends StatelessWidget {
                 Text('HOW TO PLAY', style: t.headlineMedium),
                 const SizedBox(height: MarioSpacing.sm),
                 const _Tip(
-                    emoji: '1.', text: 'Scan your play area with the camera.'),
-                const _Tip(emoji: '2.', text: 'Calibrate your swing strength.'),
+                  emoji: '1.',
+                  text: 'One phone hosts and the other phone joins.',
+                ),
+                const _Tip(
+                  emoji: '2.',
+                  text: 'Create the shared play area with the camera flow.',
+                ),
                 const _Tip(
                   emoji: '3.',
-                  text: 'Watch screen color: RED far, YELLOW near, GREEN swing!',
+                  text: 'Calibrate both phones before the rally starts.',
                 ),
                 const _Tip(
                   emoji: '4.',
+                  text:
+                      'Watch screen color: RED far, YELLOW near, GREEN swing!',
+                ),
+                const _Tip(
+                  emoji: '5.',
                   text: 'Hard swing on GREEN = SMASH for bonus points.',
                 ),
                 const SizedBox(height: MarioSpacing.sm),

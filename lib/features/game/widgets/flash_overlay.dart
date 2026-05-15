@@ -38,9 +38,7 @@ class FlashOverlay extends StatelessWidget {
 
     return IgnorePointer(
       child: AnimatedOpacity(
-        duration: a11y.reducedMotion
-            ? Duration.zero
-            : MarioMotion.flash,
+        duration: a11y.reducedMotion ? Duration.zero : MarioMotion.flash,
         opacity: 1,
         child: Container(
           color: c.withValues(alpha: 0.85),

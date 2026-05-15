@@ -123,8 +123,8 @@ class MarioTheme {
       ),
       snackBarTheme: const SnackBarThemeData(
         backgroundColor: MarioColors.bowserBlack,
-        contentTextStyle:
-            TextStyle(color: MarioColors.cloudWhite, fontWeight: FontWeight.w600),
+        contentTextStyle: TextStyle(
+            color: MarioColors.cloudWhite, fontWeight: FontWeight.w600),
         behavior: SnackBarBehavior.floating,
       ),
       visualDensity: VisualDensity.adaptivePlatformDensity,
@@ -134,7 +134,8 @@ class MarioTheme {
   static TextTheme _buildTextTheme({required bool highContrast}) {
     final pixel = GoogleFonts.pressStart2pTextTheme();
     final body = GoogleFonts.nunitoTextTheme();
-    final outline = highContrast ? MarioColors.bowserBlack : const Color(0xFF111111);
+    final outline =
+        highContrast ? MarioColors.bowserBlack : const Color(0xFF111111);
 
     return TextTheme(
       // Display & headlines use pixel font for arcade vibe (sparingly).

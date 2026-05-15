@@ -6,7 +6,7 @@ This project is a Flutter-based mobile game for both iPhone and Android. The app
 
 The core idea is simple:
 
-> The player scans their real-world play area using the phone camera, then uses the phone as a virtual paddle to hit an invisible virtual ping-pong ball through motion controls, screen indicators, blinking lights, sound cues, and haptic feedback.
+> One phone hosts the multiplayer session, the second phone joins it, both phones enter a shared spatial-creation flow, and then each player uses their phone as a virtual paddle to hit an invisible virtual ping-pong ball through motion controls, screen indicators, blinking lights, sound cues, and haptic feedback.
 
 This app does not require a physical table, a physical paddle, or a physical ball. The gameplay is created through the phone's camera, motion sensors, screen, and speakers.
 
@@ -14,29 +14,34 @@ This app does not require a physical table, a physical paddle, or a physical bal
 
 ## Core Concept
 
-The game creates a virtual table tennis experience using four main pillars:
+The game creates a virtual table tennis experience using five main pillars:
 
-1. **Spatial Setup**  
-   The player scans their play area using the phone camera. The app uses this scan to create a virtual play space.
+1. **Multiplayer Session Setup**  
+   One phone hosts the match and the other phone joins through a QR code on the same local network.
 
-2. **Phone-as-Paddle Gameplay**  
-   The player holds the phone and swings it like a ping-pong paddle. The app detects swing motion using the phone's sensors.
+2. **Shared Spatial Setup**  
+   After both phones connect, they enter the spatial-creation flow together. The host controls the scan and the joiner mirrors the progress.
 
-3. **Virtual Ball Feedback**  
+3. **Phone-as-Paddle Gameplay**  
+   Each player holds their phone and swings it like a ping-pong paddle. The app detects swing motion using the phone's sensors.
+
+4. **Virtual Ball Feedback**  
    There is no physical ball. The ball is represented through screen colors, blinking indicators, screen-edge direction cues, sound, and vibration.
 
-4. **Table Tennis Rally Logic**  
+5. **Table Tennis Rally Logic**  
    The player must time their swing correctly to hit the virtual ball, continue the rally, score points, and perform smashes.
 
 ---
 
 ## MVP Definition
 
-The MVP is a Flutter-based motion table tennis game where the player scans a real-world play area, uses their phone as a paddle, tracks a virtual invisible ball through screen-edge indicators, color states, blinking, sound, and haptics, then swings the phone to hit, rally, or smash the ball based on motion sensor input.
+The MVP is a Flutter-based local multiplayer motion table tennis game where one phone hosts, the second phone joins through a QR connection, both phones complete shared spatial creation, each player calibrates locally, and then they use their phones as paddles to track a virtual invisible ball through screen-edge indicators, color states, blinking, sound, and haptics before swinging to hit, rally, or smash based on motion sensor input.
 
 The MVP should include the complete core identity of the app:
 
 - Flutter app for iPhone and Android
+- Local multiplayer host/join flow
+- QR-based session join
 - Camera-based spatial scanning flow
 - Length and width area setup
 - Virtual play space creation
@@ -56,7 +61,7 @@ The MVP should include the complete core identity of the app:
 
 ## Gameplay Summary
 
-The player starts the app, scans their play area, and begins a rally. A virtual ball moves inside the scanned play space. Since the ball is invisible in the real world, the app communicates its position and timing using the phone screen and sound.
+The players start the app, decide which phone will host, connect the second phone through the host QR, complete shared spatial creation, calibrate locally, and then begin a rally. A virtual ball moves inside the scanned play space. Since the ball is invisible in the real world, the app communicates its position and timing using the phone screen and sound.
 
 The screen uses color indicators:
 
@@ -89,7 +94,13 @@ Home Screen
     ↓
 Safety Reminder Screen
     ↓
-Spatial Scan Screen
+Multiplayer Setup Screen
+    ↓
+Host QR / Join QR
+    ↓
+Pair Connected
+    ↓
+Shared Spatial Creation Screen
     ↓
 Confirm Play Area
     ↓
@@ -133,9 +144,28 @@ Possible text:
 
 ---
 
-### 3. Spatial Scan Screen
+### 3. Multiplayer Setup Screen
 
-The user scans the play area using the phone camera.
+The players decide which phone is the host and which phone will join.
+
+Main actions:
+
+- Host Game
+- Join Game
+
+The host phone creates the session and shows a QR code.
+
+The joiner phone scans the QR code or pastes the payload to connect.
+
+---
+
+### 4. Shared Spatial Creation Screen
+
+After the two phones connect, both phones enter the shared spatial-creation flow.
+
+The host controls the scan using the phone camera or a simulated scan UI.
+
+The joiner mirrors the scan progress and waits for the host to confirm the play area.
 
 The scan has two main parts:
 
@@ -159,7 +189,7 @@ Purpose:
 
 ---
 
-### 4. Confirm Play Area
+### 5. Confirm Play Area
 
 After scanning, the app shows that the play area is ready.
 
@@ -171,13 +201,13 @@ Length: 3.0 meters
 Play Area: Ready
 ```
 
-For the hackathon MVP, these values can be estimated or simulated as long as the scan flow clearly demonstrates the concept.
+For the hackathon MVP, these values can be estimated or simulated as long as the scan flow clearly demonstrates the concept and both phones stay in sync.
 
 ---
 
-### 5. Calibration Screen
+### 6. Calibration Screen
 
-The user performs sample swings so the app can understand their motion style.
+Each player performs sample swings on their own phone so the app can understand their motion style.
 
 Calibration can include:
 
@@ -186,7 +216,7 @@ Calibration can include:
 - Left-handed or right-handed setting
 - Swing sensitivity adjustment
 
-The goal is to determine basic thresholds for:
+The goal is to determine basic thresholds for each phone:
 
 - Weak swing
 - Normal hit
@@ -194,7 +224,7 @@ The goal is to determine basic thresholds for:
 
 ---
 
-### 6. Game Screen
+### 7. Game Screen
 
 This is the main gameplay screen.
 
@@ -216,7 +246,7 @@ Far → Near → Ready to Hit → Hit or Miss
 
 ---
 
-### 7. Result Screen
+### 8. Result Screen
 
 After the rally ends, the app shows the result.
 
@@ -233,6 +263,10 @@ Possible result data:
 
 ## Spatial Scanning Logic
 
+The spatial scan starts only after both phones are connected.
+
+The host controls the shared scan and the joiner mirrors the result.
+
 The spatial scan creates a virtual play area using the phone camera.
 
 The app needs to identify or simulate:
@@ -245,17 +279,19 @@ The app needs to identify or simulate:
 - Far zone
 - Hit zone
 
-For the hackathon MVP, the scan can be simplified into a guided scan flow:
+For the hackathon MVP, the scan can be simplified into a guided multiplayer flow:
 
 ```txt
-Step 1: Scan left boundary
-Step 2: Scan right boundary
-Step 3: Scan forward length
-Step 4: Confirm play area
-Step 5: Start game
+Step 1: Host the session
+Step 2: Join the session
+Step 3: Scan left boundary
+Step 4: Scan right boundary
+Step 5: Scan forward length
+Step 6: Confirm shared play area
+Step 7: Start calibration
 ```
 
-The important part is that the player feels like they are preparing a real play space before the game begins.
+The important part is that both players feel like they are preparing a real shared play space before the game begins.
 
 ---
 
@@ -604,7 +640,24 @@ Contains:
 
 Shows a warning before playing.
 
-### 4. Spatial Scan Screen
+### 4. Multiplayer Setup Screen
+
+Contains:
+
+- Host Game button
+- Join Game button
+- Multiplayer explanation
+
+### 5. Host / Join Screen
+
+Contains:
+
+- Host QR code
+- Join QR scanner
+- Manual payload fallback
+- Connection status
+
+### 6. Shared Spatial Creation Screen
 
 Contains:
 
@@ -613,7 +666,7 @@ Contains:
 - Scan length step
 - Confirm play area button
 
-### 5. Calibration Screen
+### 7. Calibration Screen
 
 Contains:
 
@@ -621,7 +674,7 @@ Contains:
 - Smash swing test
 - Sensitivity setup
 
-### 6. Game Screen
+### 8. Game Screen
 
 Contains:
 
@@ -632,7 +685,7 @@ Contains:
 - Edge indicators
 - Hit/miss/smash text feedback
 
-### 7. Result Screen
+### 9. Result Screen
 
 Contains:
 
@@ -722,10 +775,13 @@ Handles:
 
 ---
 
-### 2. Spatial Scan System
+### 2. Multiplayer + Spatial Setup System
 
 Handles:
 
+- Host session creation
+- Join session connection
+- QR payload generation and scan
 - Camera scan screen
 - Width scan
 - Length scan
@@ -790,8 +846,8 @@ The best split is:
 
 | Member | Role | Main Output |
 |---|---|---|
-| Member 1 | App Shell + Game Flow | Working Flutter app with screens and navigation |
-| Member 2 | Spatial Scan Setup | Scan flow for width and length |
+| Member 1 | App Shell + Multiplayer Entry | Working Flutter app with screens, host/join flow, and navigation |
+| Member 2 | Shared Spatial Creation | Host-driven scan flow for width and length |
 | Member 3 | Motion Paddle + Hit Detection | Phone swing detection and smash logic |
 | Member 4 | Sound + Light/Blinking Feedback | Red/yellow/green indicators, edge lights, and sounds |
 
@@ -809,7 +865,9 @@ Build the Flutter app structure and connect everyone's work together.
 - Create the main screens:
   - Home Screen
   - Safety Reminder Screen
-  - Scan Screen
+  - Multiplayer Setup Screen
+  - Host / Join Screen
+  - Shared Spatial Creation Screen
   - Calibration Screen
   - Game Screen
   - Result Screen
@@ -824,7 +882,7 @@ Build the Flutter app structure and connect everyone's work together.
 A working Flutter app where the user can move through this flow:
 
 ```txt
-Home → Safety Reminder → Scan Setup → Calibration → Game → Results
+Home → Safety Reminder → Multiplayer Setup → Host / Join → Shared Spatial Creation → Calibration → Game → Results
 ```
 
 This member must make sure the app runs and does not break during the demo.
@@ -835,11 +893,13 @@ This member must make sure the app runs and does not break during the demo.
 
 ### Main Responsibility
 
-Build the scan-your-play-area experience.
+Build the shared spatial-creation experience that starts after host/join pairing.
 
 ### Tasks
 
 - Create the scan setup screen
+- Make the host authoritative for scan changes
+- Make the joiner mirror scan progress
 - Add camera preview or simulated scanning UI
 - Add scan steps:
   - Scan left boundary
@@ -854,14 +914,14 @@ Build the scan-your-play-area experience.
   - "Scanning width..."
   - "Scanning length..."
   - "Play area ready"
-- Pass the play area data to the Game Screen
+- Pass the shared play area data to the Game Screen
 
 ### Expected Output After 2 Hours
 
 A convincing spatial setup flow:
 
 ```txt
-Scan Left → Scan Right → Scan Forward → Confirm Area → Start Game
+Host / Join Connected → Scan Left → Scan Right → Scan Forward → Confirm Area → Start Calibration
 ```
 
 For the hackathon MVP, the spatial scan can be simplified or simulated as long as it clearly communicates the intended concept.
@@ -1014,7 +1074,7 @@ Each member builds their assigned part.
 Connect the systems:
 
 ```txt
-Scan data → Game Screen
+Shared scan data → Game Screen
 Motion swing → Hit detection
 Ball state → Blinking UI
 Ball state → Sound feedback
@@ -1032,7 +1092,8 @@ Priority checklist:
 
 - App opens correctly
 - Navigation works
-- Scan flow works
+- Host / join flow works
+- Shared scan flow works
 - Game screen shows indicators
 - Swing detection works
 - Hit/smash/miss feedback appears
@@ -1117,7 +1178,7 @@ lib/features/game/ball_feedback_widget.dart
 The demo should prove this core flow:
 
 ```txt
-Scan space → Start game → Ball indicator appears → User swings phone → App detects hit/smash/miss → Score updates → Result screen
+Host session → Join session → Shared spatial creation → Local calibration → Start game → Ball indicator appears → User swings phone → App detects hit/smash/miss → Score updates → Result screen
 ```
 
 As long as this flow works, the MVP successfully communicates the full game idea.
@@ -1130,7 +1191,7 @@ Do not spend time on:
 
 - Login/signup
 - Database
-- Multiplayer
+- Online multiplayer beyond local host/join
 - Leaderboards
 - Complex account system
 - Advanced settings
@@ -1144,4 +1205,4 @@ The priority is to make the core game interaction work.
 
 ## Final MVP Statement
 
-This app is a tableless and ball-less table tennis-inspired mobile game where the phone becomes the paddle. The player scans their space, follows visual and audio cues from a virtual ball, and swings the phone to hit, rally, or smash. The game combines spatial setup, motion controls, sound feedback, blinking screen indicators, and timing-based table tennis logic into one Flutter mobile experience.
+This app is a tableless and ball-less table tennis-inspired mobile game where one phone hosts, the other phone joins, both phones create a shared play space, and then each player uses their phone as the paddle. The game combines multiplayer setup, spatial creation, motion controls, sound feedback, blinking screen indicators, and timing-based table tennis logic into one Flutter mobile experience.

@@ -103,7 +103,10 @@ class _SafetyScreenState extends State<SafetyScreen> {
                 icon: const Icon(Icons.arrow_forward_rounded),
                 expand: true,
                 onPressed: _agreed
-                    ? () => Navigator.pushReplacementNamed(context, Routes.scan)
+                    ? () => Navigator.pushReplacementNamed(
+                          context,
+                          Routes.multiplayerSetup,
+                        )
                     : null,
               ),
               const SizedBox(height: MarioSpacing.sm),

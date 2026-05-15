@@ -61,7 +61,8 @@ class _MarioButtonState extends State<MarioButton> {
           ),
           transform: Matrix4.translationValues(0, _pressed ? shadow : 0, 0),
           decoration: BoxDecoration(
-            color: disabled ? widget.color.withValues(alpha: 0.45) : widget.color,
+            color:
+                disabled ? widget.color.withValues(alpha: 0.45) : widget.color,
             borderRadius: BorderRadius.circular(MarioRadius.md),
             border: Border.all(color: MarioColors.bowserBlack, width: 3),
             boxShadow: _pressed || disabled
@@ -103,6 +104,8 @@ class _MarioButtonState extends State<MarioButton> {
       ),
     );
 
-    return widget.expand ? SizedBox(width: double.infinity, child: child) : child;
+    return widget.expand
+        ? SizedBox(width: double.infinity, child: child)
+        : child;
   }
 }

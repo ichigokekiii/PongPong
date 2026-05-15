@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../app.dart';
 import '../../core/accessibility/a11y_controller.dart';
+import '../multiplayer/multiplayer_session_controller.dart';
 import '../../theme/mario_theme.dart';
 import '../results/result_screen.dart';
 import 'game_controller.dart';
@@ -22,8 +23,9 @@ import 'widgets/score_hud.dart';
 /// during play. The bottom area is a dim "grip pad" that hosts only the
 /// slide-up demo controls trigger.
 class GameScreen extends StatefulWidget {
-  const GameScreen({super.key, required this.a11y});
+  const GameScreen({super.key, required this.a11y, this.sessionController});
   final A11yController a11y;
+  final MultiplayerSessionController? sessionController;
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -45,7 +47,8 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _openDemoControls() {
-    HapticFeedback.selectionClick(); // TODO(member-4): route via haptic service.
+    HapticFeedback
+        .selectionClick(); // TODO(member-4): route via haptic service.
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -87,7 +90,8 @@ class _GameScreenState extends State<GameScreen> {
           return Stack(
             children: [
               // === TOP-ANCHORED PLAY ZONE (60% of height) ===================
-              Positioned.fill(child: _PlayZone(controller: _controller, a11y: widget.a11y)),
+              Positioned.fill(
+                  child: _PlayZone(controller: _controller, a11y: widget.a11y)),
 
               // === BOTTOM "GRIP PAD" ========================================
               _GripPad(a11y: widget.a11y),
@@ -110,6 +114,42 @@ class _GameScreenState extends State<GameScreen> {
                   ),
                 ),
               ),
+
+              if (widget.sessionController != null)
+                Positioned(
+                  left: MarioSpacing.sm,
+                  right: MarioSpacing.sm,
+                  bottom: 96,
+                  child: AnimatedBuilder(
+                    animation: widget.sessionController!,
+                    builder: (context, _) {
+                      final state = widget.sessionController!.state;
+                      return IgnorePointer(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: MarioSpacing.sm,
+                            vertical: MarioSpacing.xs,
+                          ),
+                          decoration: BoxDecoration(
+                            color:
+                                MarioColors.cloudWhite.withValues(alpha: 0.9),
+                            borderRadius: BorderRadius.circular(MarioRadius.md),
+                            border: Border.all(
+                              color: MarioColors.bowserBlack,
+                              width: 2,
+                            ),
+                          ),
+                          child: Text(
+                            'MULTIPLAYER · ${state.role?.name.toUpperCase() ?? 'PLAYER'} · '
+                            '${state.isConnected ? 'CONNECTED' : state.disconnectReason ?? 'DISCONNECTED'}',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.labelLarge,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
 
               // === FLASH OVERLAY (hit / smash / miss) =======================
               ValueListenableBuilder<SwingEvent>(

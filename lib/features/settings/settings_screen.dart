@@ -117,8 +117,7 @@ class _SettingSwitch extends StatelessWidget {
       contentPadding: EdgeInsets.zero,
       activeThumbColor: MarioColors.cloudWhite,
       activeTrackColor: MarioColors.pipe,
-      inactiveTrackColor:
-          MarioColors.bowserBlack.withValues(alpha: 0.18),
+      inactiveTrackColor: MarioColors.bowserBlack.withValues(alpha: 0.18),
       title: Text(title, style: t.titleMedium),
       subtitle: Padding(
         padding: const EdgeInsets.only(top: 2),

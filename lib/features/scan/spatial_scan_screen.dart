@@ -69,8 +69,7 @@ class _SpatialScanScreenState extends State<SpatialScanScreen>
   String get _body => switch (_step) {
         _ScanStep.left =>
           'Point your phone toward the LEFT edge of your play area.',
-        _ScanStep.right =>
-          'Now point at the RIGHT edge. Stay steady, captain.',
+        _ScanStep.right => 'Now point at the RIGHT edge. Stay steady, captain.',
         _ScanStep.length =>
           'Aim forward. We are measuring how deep you can swing.',
         _ScanStep.confirm =>

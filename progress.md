@@ -2,46 +2,51 @@
 
 ## Status
 
-Project scaffold is created and the local Flutter environment is mostly ready. The main remaining blocker is physical iPhone deployment through Xcode because the required iOS device support/runtime for the connected phone still needs to be installed in Xcode.
+The app flow now supports the multiplayer-first MVP path: host, join, pair, shared spatial creation, local calibration, then game. The main remaining blockers are dependency resolution and full device verification on two physical phones.
 
 ## Completed
 
 - [x] Reviewed the product spec in [agent.md](/Users/jc/PongPong/agent.md)
-- [x] Created the Flutter project at the repo root
-- [x] Enabled `ios` and `android` targets
-- [x] Set bundle/application id to `com.jc.pongpong`
-- [x] Replaced the default counter app with a basic MVP flow scaffold
-- [x] Added core packages:
-  - `sensors_plus`
-  - `camera`
-  - `audioplayers`
-  - `vibration`
-- [x] Added iOS camera usage description
-- [x] Added Android camera permission
-- [x] Updated shell config so Android SDK tools are on `PATH`
-- [x] Installed Android command-line tools
-- [x] Accepted Android SDK licenses
-- [x] Verified `flutter analyze`
-- [x] Verified `flutter test`
-- [x] Verified `flutter doctor -v` is green for Flutter and Android
+- [x] Added the multiplayer setup route after safety
+- [x] Added host and join screens
+- [x] Added QR payload generation and QR scan entry points
+- [x] Added local-network WebSocket session scaffolding
+- [x] Added shared spatial-creation flow where the host controls scan progress
+- [x] Added local calibration waiting logic so both phones must be ready before game start
+- [x] Updated iOS local-network permission text
+- [x] Updated Android internet permission
+- [x] Updated [README.md](/Users/jc/PongPong/README.md), [agent.md](/Users/jc/PongPong/agent.md), and [progress.md](/Users/jc/PongPong/progress.md) to reflect the multiplayer-first setup flow
 
 ## In Progress
 
-- [ ] Finish iPhone deployment from Xcode
+- [ ] Resolve new Flutter dependencies with `flutter pub get`
+- [ ] Run `flutter analyze`
+- [ ] Run `flutter test`
 
 ## Next Steps
 
-- [ ] In Xcode, install the missing `iOS 26.2` platform/components support
-- [ ] Reconnect the iPhone and make sure it is unlocked and trusted
-- [ ] Confirm `Signing & Capabilities` has your Apple team selected
-- [ ] Run the app on the physical iPhone from Xcode or `flutter run`
-- [ ] Confirm the scaffold navigates through:
+- [ ] Verify host flow on phone 1:
   - `Home`
   - `Safety`
-  - `Scan`
+  - `Multiplayer Setup`
+  - `Host QR`
+  - `Shared Spatial Creation`
   - `Calibration`
   - `Game`
   - `Results`
+- [ ] Verify join flow on phone 2:
+  - `Home`
+  - `Safety`
+  - `Multiplayer Setup`
+  - `Join QR`
+  - `Shared Spatial Creation`
+  - `Calibration`
+  - `Game`
+  - `Results`
+- [ ] Confirm both phones can connect on the same local network
+- [ ] Confirm the host can change scan values and the joiner mirrors them
+- [ ] Confirm host confirmation moves both phones into calibration
+- [ ] Confirm both phones must finish calibration before gameplay starts
 
 ## Current Markdown Files
 
@@ -53,5 +58,6 @@ Project scaffold is created and the local Flutter environment is mostly ready. T
 
 ## Notes
 
-- The `iOS 26.2 is not installed` error is currently the main blocker for running on the connected iPhone.
-- The iOS Simulator warning in `flutter doctor` is separate from the Android toolchain and does not affect the completed Android setup work.
+- The multiplayer MVP assumes both phones are on the same local network.
+- The join flow supports QR scanning and manual payload paste as a fallback.
+- Full two-device validation still needs to happen on real hardware.

@@ -19,8 +19,7 @@ class GameController {
   final ValueNotifier<BallEdge> ballEdge = ValueNotifier(BallEdge.center);
   final ValueNotifier<BallSpeed> speed = ValueNotifier(BallSpeed.slow);
   final ValueNotifier<SwingEvent> lastEvent = ValueNotifier(SwingEvent.none);
-  final ValueNotifier<GameStatus> status =
-      ValueNotifier(GameStatus.playing);
+  final ValueNotifier<GameStatus> status = ValueNotifier(GameStatus.playing);
   final ValueNotifier<int> score = ValueNotifier(0);
   final ValueNotifier<int> rally = ValueNotifier(0);
   final ValueNotifier<int> longestRally = ValueNotifier(0);
@@ -89,8 +88,7 @@ class GameController {
   void resume() => status.value = GameStatus.playing;
 
   /// Computed: hits / attempts as a 0..1 accuracy ratio.
-  double get accuracy =>
-      attempts.value == 0 ? 0 : hits.value / attempts.value;
+  double get accuracy => attempts.value == 0 ? 0 : hits.value / attempts.value;
 
   void dispose() {
     ballState.dispose();

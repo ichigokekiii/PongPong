@@ -201,6 +201,7 @@
 				97C146EC1CF9000F007C117D /* Resources */,
 				9705A1C41CF9048500538489 /* Embed Frameworks */,
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
+				7884E8682EC3CC0800C636F2 /* Codesign Native Assets */,
 				64FBAD40F5CED8B6F49C1551 /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
@@ -271,6 +272,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		7884E8682EC3CC0800C636F2 /* Codesign Native Assets */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Codesign Native Assets";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/sh \"$PROJECT_DIR/Flutter/codesign_native_assets.sh\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
 		2003535C53E5826E90503C17 /* [CP] Check Pods Manifest.lock */ = {

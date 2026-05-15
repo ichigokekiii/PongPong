@@ -5,13 +5,19 @@ import '../../core/accessibility/a11y_controller.dart';
 import '../../core/widgets/mario_block_card.dart';
 import '../../core/widgets/mario_button.dart';
 import '../../core/widgets/section_header.dart';
+import '../multiplayer/multiplayer_session_controller.dart';
 import '../../theme/mario_theme.dart';
 
 /// Swing-strength calibration UI. Sensor logic is Member 3's job — this only
 /// shows the guided flow + UI mock for normal / smash thresholds.
 class CalibrationScreen extends StatefulWidget {
-  const CalibrationScreen({super.key, required this.a11y});
+  const CalibrationScreen({
+    super.key,
+    required this.a11y,
+    this.sessionController,
+  });
   final A11yController a11y;
+  final MultiplayerSessionController? sessionController;
 
   @override
   State<CalibrationScreen> createState() => _CalibrationScreenState();
@@ -21,10 +27,38 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
   bool _normalDone = false;
   bool _smashDone = false;
   double _sensitivity = 0.5;
+  bool _submitted = false;
+  bool _navigated = false;
 
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
+    if (widget.sessionController == null) {
+      return _buildContent(context, t);
+    }
+
+    return AnimatedBuilder(
+      animation: widget.sessionController!,
+      builder: (context, _) => _buildContent(context, t),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, TextTheme t) {
+    final sessionState = widget.sessionController?.state;
+    if (sessionState?.readyForGame == true && !_navigated) {
+      _navigated = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        Navigator.pushReplacementNamed(
+          context,
+          Routes.game,
+          arguments: widget.sessionController,
+        );
+      });
+    }
+
     return Scaffold(
       backgroundColor: MarioColors.luigiGreen,
       appBar: AppBar(
@@ -44,6 +78,16 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
                 titleColor: MarioColors.cloudWhite,
               ),
               const SizedBox(height: MarioSpacing.md),
+              if (sessionState != null) ...[
+                MarioBlockCard(
+                  child: Text(
+                    'Room ${sessionState.payload?.roomId ?? '--'} · ${sessionState.role?.name ?? 'player'}\n'
+                    'You: ${sessionState.localCalibrationReady ? 'ready' : 'not ready yet'} · '
+                    'Peer: ${sessionState.peerCalibrationReady ? 'ready' : 'waiting'}',
+                  ),
+                ),
+                const SizedBox(height: MarioSpacing.sm),
+              ],
               Expanded(
                 child: SingleChildScrollView(
                   child: Column(
@@ -51,19 +95,25 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
                       _CalibTile(
                         icon: Icons.sports_tennis_rounded,
                         title: 'Normal swing',
-                        body: 'Swing the phone like you would for a regular hit.',
+                        body:
+                            'Swing the phone like you would for a regular hit.',
                         done: _normalDone,
                         a11y: widget.a11y,
-                        onCapture: () => setState(() => _normalDone = true),
+                        onCapture: _submitted
+                            ? () {}
+                            : () => setState(() => _normalDone = true),
                       ),
                       const SizedBox(height: MarioSpacing.sm),
                       _CalibTile(
                         icon: Icons.bolt_rounded,
                         title: 'Smash swing',
-                        body: 'Now swing HARD. Like a Bowser-launching power-up.',
+                        body:
+                            'Now swing HARD. Like a Bowser-launching power-up.',
                         done: _smashDone,
                         a11y: widget.a11y,
-                        onCapture: () => setState(() => _smashDone = true),
+                        onCapture: _submitted
+                            ? () {}
+                            : () => setState(() => _smashDone = true),
                       ),
                       const SizedBox(height: MarioSpacing.sm),
                       MarioBlockCard(
@@ -86,14 +136,15 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
                                 inactiveTrackColor: MarioColors.bowserBlack
                                     .withValues(alpha: 0.15),
                                 thumbColor: MarioColors.marioRed,
-                                overlayColor: MarioColors.marioRed
-                                    .withValues(alpha: 0.2),
+                                overlayColor:
+                                    MarioColors.marioRed.withValues(alpha: 0.2),
                                 trackHeight: 8,
                               ),
                               child: Slider(
                                 value: _sensitivity,
-                                onChanged: (v) =>
-                                    setState(() => _sensitivity = v),
+                                onChanged: _submitted
+                                    ? null
+                                    : (v) => setState(() => _sensitivity = v),
                               ),
                             ),
                           ],
@@ -101,6 +152,17 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
                       ),
                       const SizedBox(height: MarioSpacing.sm),
                       _HandednessSelector(a11y: widget.a11y),
+                      if (_submitted &&
+                          sessionState != null &&
+                          !sessionState.readyForGame) ...[
+                        const SizedBox(height: MarioSpacing.sm),
+                        const MarioBlockCard(
+                          background: MarioColors.coin,
+                          child: Text(
+                            'Your calibration is locked in. Waiting for the other phone to finish before the rally starts.',
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -109,13 +171,27 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
               MarioButton(
                 a11y: widget.a11y,
                 label: _normalDone && _smashDone
-                    ? 'START THE RALLY'
+                    ? widget.sessionController == null
+                        ? 'START THE RALLY'
+                        : _submitted
+                            ? 'WAITING FOR OTHER PHONE'
+                            : 'LOCK CALIBRATION'
                     : 'COMPLETE BOTH SWINGS',
                 icon: const Icon(Icons.play_arrow_rounded),
                 expand: true,
                 color: MarioColors.marioRed,
                 onPressed: _normalDone && _smashDone
-                    ? () => Navigator.pushReplacementNamed(context, Routes.game)
+                    ? () {
+                        if (widget.sessionController == null) {
+                          Navigator.pushReplacementNamed(context, Routes.game);
+                          return;
+                        }
+                        if (_submitted) {
+                          return;
+                        }
+                        setState(() => _submitted = true);
+                        widget.sessionController!.markCalibrationReady();
+                      }
                     : null,
               ),
               const SizedBox(height: MarioSpacing.sm),

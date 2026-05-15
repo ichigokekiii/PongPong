@@ -1,88 +1,54 @@
-# PhonePong
+# PongPong
 
-Phone-as-paddle motion table tennis - **UI/UX shell** for the 2-hour hackathon MVP.
-This repository contains the **front-end only**. Sensor, audio, haptic, and game-loop
-logic are stubbed so the team can wire them in independently.
+Flutter multiplayer MVP scaffold for a motion-controlled table tennis game where each player uses their phone as the paddle.
 
-## Visual Identity
+## Current App Flow
 
-Inspired by classic Mario palette:
+`Home -> Safety -> Multiplayer Setup -> Host QR / Join QR -> Shared Spatial Creation -> Local Calibration -> Game -> Results`
 
-| Token            | Hex       | Purpose                           |
-| ---------------- | --------- | --------------------------------- |
-| Mario Red        | `#E52521` | Ball-far state, primary CTA       |
-| Coin Gold        | `#FBD000` | Ball-near state, score chips      |
-| Pipe Green       | `#00A651` | Ball-ready state, success         |
-| Sky Blue         | `#5C94FC` | Background, calm states           |
-| Mario Blue       | `#049CD8` | Accents                           |
-| Bowser Black     | `#000000` | 2-3 px outlines (Mario signature) |
+## Multiplayer Setup
 
-## Run
+- One phone hosts the session
+- The second phone joins by scanning the host QR code or pasting the payload
+- Both phones must connect on the same local network
+- After pairing, both phones enter shared spatial creation
+- The host controls the shared scan and the joiner mirrors the progress
+- After spatial creation, each phone calibrates locally
+
+## Current Dependencies
+
+- `sensors_plus`
+- `camera`
+- `audioplayers`
+- `vibration`
+- `qr_flutter`
+- `mobile_scanner`
+
+## Run The Project
 
 ```bash
-flutter create --org com.phonepong --project-name phonepong .   # adds android/ ios/ scaffolding
 flutter pub get
+flutter analyze
+flutter test
 flutter run
 ```
 
-> The `flutter create .` step only needs to run once - it adds the platform folders
-> without overwriting any of the `lib/` or `pubspec.yaml` files in this repo.
+## iPhone Setup
 
-## Screen Flow
+1. Connect the iPhone to the Mac with a cable.
+2. Trust the Mac on the iPhone if prompted.
+3. Enable `Developer Mode` on the iPhone.
+4. Open [ios/Runner.xcworkspace](/Users/jc/PongPong/ios/Runner.xcworkspace).
+5. In Xcode, select the `Runner` target, then set:
+   - your Apple ID team under `Signing & Capabilities`
+   - a unique bundle identifier if `com.jc.pongpong` conflicts on your account
+6. Choose your physical iPhone as the run destination in Xcode once it appears.
+7. Make sure both demo phones are on the same local network for host/join testing.
 
-```text
-Home -> Safety Reminder -> Spatial Scan -> Calibration -> Game -> Result
-                                                        ^       |
-                                                        +-- Play Again
-```
+## Android Notes
 
-## Mock Game Interactivity
+Android support is scaffolded and the local SDK basics are ready. Main-manifest internet permission is enabled for the local multiplayer session.
 
-Inside `GameScreen` a slide-up **Demo Controls** sheet lets you:
+## Product Spec
 
-- Toggle ball state `far` / `near` / `ready`
-- Trigger blinks on left / right / top / bottom edges
-- Fire `hit`, `smash`, or `miss` events
-- Bump score / rally counters
-
-All sensor & audio calls are placeholder `// TODO(member-N)` stubs in
-`lib/features/game/game_controller.dart`.
-
-## Accessibility
-
-All four toggles live in **Settings** and are read by every screen via
-`A11yController` (a `ChangeNotifier` singleton-ish):
-
-- High contrast (boosts outlines, removes translucency)
-- Larger touch targets (54 pt buttons)
-- Reduced motion (disables blinks/pulses, keeps color states)
-- Left / right-handed UI mirror (flips bottom controls & HUD chips)
-
-## Architecture (hackathon edition)
-
-```text
-lib/
-  main.dart
-  app.dart                              # MaterialApp + routes
-  theme/mario_theme.dart                # tokens + ThemeData
-  core/
-    accessibility/a11y_controller.dart
-    painters/                           # CustomPainter assets
-    widgets/                            # reusable Mario widgets
-  features/
-    home/         home_screen.dart
-    safety/       safety_screen.dart
-    scan/         spatial_scan_screen.dart
-    calibration/  calibration_screen.dart
-    game/
-      game_controller.dart              # ValueNotifier game state
-      models/game_state_models.dart
-      game_screen.dart
-      widgets/
-    results/      result_screen.dart
-    settings/     settings_screen.dart
-```
-
-State management is intentionally lightweight - `ValueNotifier` /
-`ChangeNotifier` + `ValueListenableBuilder` - per the hackathon brief. Swap to
-`get_it` + `watch_it` post-MVP if the codebase grows.
+The gameplay and MVP requirements live in [agent.md](/Users/jc/PongPong/agent.md).

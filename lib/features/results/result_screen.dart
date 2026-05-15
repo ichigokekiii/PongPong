@@ -90,7 +90,8 @@ class ResultScreen extends StatelessWidget {
               MarioBlockCard(
                 child: Column(
                   children: [
-                    _StatRow(label: 'Longest rally', value: '${args.longestRally}'),
+                    _StatRow(
+                        label: 'Longest rally', value: '${args.longestRally}'),
                     _StatRow(label: 'Hits', value: '${args.hits}'),
                     _StatRow(label: 'Smashes', value: '${args.smashes}'),
                     _StatRow(

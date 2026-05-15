@@ -4,14 +4,13 @@ import 'scanned_area_model.dart';
 
 class ScanController extends ChangeNotifier {
   ScanController({ScannedAreaModel? initialArea, ScanStep? initialStep})
-    : _area =
-          initialArea ??
-          const ScannedAreaModel(
-            leftReachMeters: 1.2,
-            rightReachMeters: 1.3,
-            lengthMeters: 3.0,
-          ),
-      _currentStep = initialStep ?? ScanStep.leftBoundary;
+      : _area = initialArea ??
+            const ScannedAreaModel(
+              leftReachMeters: 1.2,
+              rightReachMeters: 1.3,
+              lengthMeters: 3.0,
+            ),
+        _currentStep = initialStep ?? ScanStep.leftBoundary;
 
   ScanStep _currentStep;
   ScannedAreaModel _area;

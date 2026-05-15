@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>PongPong uses the camera to scan and confirm your play area before a rally.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>PongPong uses your local network so one phone can host a multiplayer session and the other phone can join it before spatial creation.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

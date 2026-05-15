@@ -69,8 +69,18 @@ class ScoreHud extends StatelessWidget {
     );
 
     final leading = a11y.mirrorForLeftHand
-        ? <Widget>[demoBtn, const SizedBox(width: MarioSpacing.xs), Expanded(child: chips), pauseBtn]
-        : <Widget>[pauseBtn, const SizedBox(width: MarioSpacing.xs), Expanded(child: chips), demoBtn];
+        ? <Widget>[
+            demoBtn,
+            const SizedBox(width: MarioSpacing.xs),
+            Expanded(child: chips),
+            pauseBtn
+          ]
+        : <Widget>[
+            pauseBtn,
+            const SizedBox(width: MarioSpacing.xs),
+            Expanded(child: chips),
+            demoBtn
+          ];
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,

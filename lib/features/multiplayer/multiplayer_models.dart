@@ -100,7 +100,7 @@ class SharedScanState {
     return SharedScanState(
       step: ScanStepPresentation.fromName(json['step'] as String? ?? ''),
       area: ScannedAreaModel.fromJson(
-        (json['area'] as Map<String, dynamic>?) ?? <String, dynamic>{},
+        Map<String, dynamic>.from(json['area'] as Map? ?? <String, dynamic>{}),
       ),
       confirmed: json['confirmed'] as bool? ?? false,
     );
@@ -132,7 +132,8 @@ class MultiplayerSessionState {
 
   bool get isHost => role == SessionRole.host;
   bool get isJoiner => role == SessionRole.joiner;
-  bool get isConnected => connectionStatus == MultiplayerConnectionStatus.connected;
+  bool get isConnected =>
+      connectionStatus == MultiplayerConnectionStatus.connected;
   bool get canControlScan => isHost && isConnected;
   bool get readyForGame =>
       isConnected && localCalibrationReady && peerCalibrationReady;
@@ -159,7 +160,8 @@ class MultiplayerSessionState {
       localCalibrationReady:
           localCalibrationReady ?? this.localCalibrationReady,
       peerCalibrationReady: peerCalibrationReady ?? this.peerCalibrationReady,
-      errorMessage: clearErrorMessage ? null : errorMessage ?? this.errorMessage,
+      errorMessage:
+          clearErrorMessage ? null : errorMessage ?? this.errorMessage,
       disconnectReason: clearDisconnectReason
           ? null
           : disconnectReason ?? this.disconnectReason,

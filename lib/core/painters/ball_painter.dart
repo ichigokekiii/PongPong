@@ -47,7 +47,8 @@ class BallPainter extends CustomPainter {
 }
 
 class BallIcon extends StatelessWidget {
-  const BallIcon({super.key, this.size = 24, this.color = MarioColors.cloudWhite});
+  const BallIcon(
+      {super.key, this.size = 24, this.color = MarioColors.cloudWhite});
 
   final double size;
   final Color color;
