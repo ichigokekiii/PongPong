@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:sensors_plus/sensors_plus.dart';
 
 import '../../app/routes.dart';
 import '../calibration/swing_profile_model.dart';
@@ -31,6 +33,8 @@ class _GameScreenState extends State<GameScreen> {
   Timer? _sessionTimer;
   Timer? _ballTimer;
   Timer? _resultTimer;
+  StreamSubscription<UserAccelerometerEvent>? _accelerometerSubscription;
+  StreamSubscription<GyroscopeEvent>? _gyroscopeSubscription;
 
   int _secondsRemaining = _matchLengthSeconds;
   int _score = 0;
@@ -42,20 +46,24 @@ class _GameScreenState extends State<GameScreen> {
 
   double _ballSpeed = 1;
   double _peakBallSpeed = 1;
-  double _mockAcceleration = 1.8;
-  double _mockGyro = 0.7;
+  double _liveAcceleration = 0;
+  double _liveGyro = 0;
 
   BallState _ballState = BallState.far;
   GameStatus _status = GameStatus.ready;
   BallLane _ballLane = BallLane.left;
   bool _canSwing = false;
   bool _finished = false;
+  bool _motionAvailable = false;
   String _lastEvent = 'Ready to serve';
+  String _motionStatus = 'Connecting motion sensors';
+  DateTime _lastDetectedSwing = DateTime.fromMillisecondsSinceEpoch(0);
 
   @override
   void initState() {
     super.initState();
     _startSession();
+    _initializeMotionSensors();
   }
 
   @override
@@ -63,7 +71,110 @@ class _GameScreenState extends State<GameScreen> {
     _sessionTimer?.cancel();
     _ballTimer?.cancel();
     _resultTimer?.cancel();
+    _accelerometerSubscription?.cancel();
+    _gyroscopeSubscription?.cancel();
     super.dispose();
+  }
+
+  Future<void> _initializeMotionSensors() async {
+    try {
+      _accelerometerSubscription = userAccelerometerEventStream(
+        samplingPeriod: SensorInterval.gameInterval,
+      ).listen(
+        (event) {
+          if (!mounted) {
+            return;
+          }
+
+          setState(() {
+            _liveAcceleration = _vectorMagnitude(event.x, event.y, event.z);
+          });
+
+          _maybeRegisterSensorSwing();
+        },
+        onError: _handleMotionError,
+      );
+
+      _gyroscopeSubscription = gyroscopeEventStream(
+        samplingPeriod: SensorInterval.gameInterval,
+      ).listen(
+        (event) {
+          if (!mounted) {
+            return;
+          }
+
+          setState(() {
+            _liveGyro = _vectorMagnitude(event.x, event.y, event.z);
+          });
+
+          _maybeRegisterSensorSwing();
+        },
+        onError: _handleMotionError,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _motionAvailable = true;
+        _motionStatus = 'Live accelerometer + gyroscope feed';
+      });
+    } on MissingPluginException {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _motionStatus = 'Motion sensors are unavailable in this environment';
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _motionStatus = 'Unable to connect to motion sensors';
+      });
+    }
+  }
+
+  void _handleMotionError(Object _) {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _motionAvailable = false;
+      _motionStatus = 'Unable to read motion sensor data';
+    });
+  }
+
+  double _vectorMagnitude(double x, double y, double z) {
+    return math.sqrt((x * x) + (y * y) + (z * z));
+  }
+
+  void _maybeRegisterSensorSwing() {
+    if (!_motionAvailable || _finished || _ballState != BallState.ready) {
+      return;
+    }
+
+    final now = DateTime.now();
+    if (now.difference(_lastDetectedSwing) < const Duration(milliseconds: 800)) {
+      return;
+    }
+
+    final accelerationThreshold = widget.args.swingProfile.hitThreshold;
+    final smashThreshold = widget.args.swingProfile.smashThreshold;
+
+    if (_liveAcceleration < accelerationThreshold || _liveGyro < 2.2) {
+      return;
+    }
+
+    _lastDetectedSwing = now;
+    _registerSwing(
+      smash: _liveAcceleration >= smashThreshold || _liveGyro >= 6,
+    );
   }
 
   void _startSession() {
@@ -130,8 +241,6 @@ class _GameScreenState extends State<GameScreen> {
           _ballLane =
               BallLane.values[(_attempts + _hits + _smashes + 1) %
                   BallLane.values.length];
-          _mockAcceleration = 2.4;
-          _mockGyro = 1.6;
           _lastEvent = 'Ball approaching from ${_laneLabel(_ballLane)}';
         });
         _scheduleBallPhase();
@@ -140,8 +249,6 @@ class _GameScreenState extends State<GameScreen> {
           _ballState = BallState.ready;
           _canSwing = true;
           _attempts += 1;
-          _mockAcceleration = 3.9;
-          _mockGyro = 4.4;
           _lastEvent = 'Hit window open';
         });
         _scheduleBallPhase();
@@ -179,10 +286,6 @@ class _GameScreenState extends State<GameScreen> {
       _bestRally = math.max(_bestRally, _rally);
       _ballSpeed = (_ballSpeed + (smash ? 0.45 : 0.18)).clamp(1, 3.5);
       _peakBallSpeed = math.max(_peakBallSpeed, _ballSpeed);
-      _mockAcceleration = smash
-          ? widget.args.swingProfile.smashThreshold + 1.1
-          : widget.args.swingProfile.hitThreshold + 0.5;
-      _mockGyro = smash ? 8.1 : 5.7;
 
       if (smash) {
         _smashes += 1;
@@ -340,11 +443,11 @@ class _GameScreenState extends State<GameScreen> {
                     const SizedBox(height: 12),
                     _IntegrationPanel(
                       title: 'Motion paddle integration',
-                      subtitle: 'Member 3 handoff',
+                      subtitle: _motionStatus,
                       metrics: [
                         'Hand ${widget.args.swingProfile.handLabel}',
-                        'Accel ${_mockAcceleration.toStringAsFixed(1)} g',
-                        'Gyro ${_mockGyro.toStringAsFixed(1)} rad/s',
+                        'Accel ${_liveAcceleration.toStringAsFixed(1)} m/s²',
+                        'Gyro ${_liveGyro.toStringAsFixed(1)} rad/s',
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -367,14 +470,20 @@ class _GameScreenState extends State<GameScreen> {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () => _registerSwing(smash: false),
-                    child: const Text('Hit Swing'),
+                    child: Text(
+                      _motionAvailable ? 'Manual Hit Override' : 'Hit Swing',
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () => _registerSwing(smash: true),
-                    child: const Text('Smash Swing'),
+                    child: Text(
+                      _motionAvailable
+                          ? 'Manual Smash Override'
+                          : 'Smash Swing',
+                    ),
                   ),
                 ),
               ],

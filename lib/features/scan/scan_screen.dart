@@ -1,4 +1,6 @@
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../app/routes.dart';
 import 'scanned_area_model.dart';
@@ -34,8 +36,150 @@ class ScanScreen extends StatefulWidget {
 class _ScanScreenState extends State<ScanScreen> {
   int _stepIndex = 0;
   ScannedArea _area = ScannedArea.empty();
+  CameraController? _cameraController;
+  String _cameraStatus = 'Preparing live camera preview...';
 
   _ScanStep get _step => _ScanStep.values[_stepIndex];
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeCamera();
+  }
+
+  @override
+  void dispose() {
+    _cameraController?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _initializeCamera() async {
+    final previousController = _cameraController;
+    _cameraController = null;
+    await previousController?.dispose();
+
+    if (mounted) {
+      setState(() {
+        _cameraStatus = 'Preparing live camera preview...';
+      });
+    }
+
+    try {
+      final cameras = await availableCameras();
+      if (cameras.isEmpty) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _cameraStatus = 'No camera was found on this device.';
+        });
+        return;
+      }
+
+      final selectedCamera = cameras.firstWhere(
+        (camera) => camera.lensDirection == CameraLensDirection.back,
+        orElse: () => cameras.first,
+      );
+
+      final controller = CameraController(
+        selectedCamera,
+        ResolutionPreset.medium,
+        enableAudio: false,
+      );
+
+      await controller.initialize();
+
+      if (!mounted) {
+        await controller.dispose();
+        return;
+      }
+
+      setState(() {
+        _cameraController = controller;
+        _cameraStatus = 'Live camera preview ready';
+      });
+    } on CameraException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _cameraStatus = switch (error.code) {
+          'CameraAccessDenied' =>
+            'Camera permission denied. Allow access to scan your space.',
+          'CameraAccessDeniedWithoutPrompt' =>
+            'Camera access is blocked. Open settings to enable it.',
+          'CameraAccessRestricted' =>
+            'Camera access is restricted on this device.',
+          _ => 'Unable to start the camera preview.',
+        };
+      });
+    } on MissingPluginException {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _cameraStatus =
+            'Camera plugin is unavailable in this environment.';
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _cameraStatus = 'Unable to start the camera preview.';
+      });
+    }
+  }
+
+  Widget _buildCameraSurface() {
+    final controller = _cameraController;
+    if (controller != null && controller.value.isInitialized) {
+      return Container(
+        color: Colors.black,
+        alignment: Alignment.center,
+        child: AspectRatio(
+          aspectRatio: controller.value.aspectRatio,
+          child: CameraPreview(controller),
+        ),
+      );
+    }
+
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF223645), Color(0xFF101A22)],
+        ),
+      ),
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.camera_alt_outlined,
+                size: 42,
+                color: Colors.white70,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _cameraStatus,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: _initializeCamera,
+                child: const Text('Retry camera'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   void _advanceScan() {
     setState(() {
@@ -91,17 +235,11 @@ class _ScanScreenState extends State<ScanScreen> {
                       ),
                       const SizedBox(height: 16),
                       Expanded(
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(24),
-                            gradient: const LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [Color(0xFF223645), Color(0xFF101A22)],
-                            ),
-                          ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(24),
                           child: Stack(
                             children: [
+                              Positioned.fill(child: _buildCameraSurface()),
                               const Positioned.fill(child: _ScannerGrid()),
                               Center(
                                 child: Container(
@@ -116,12 +254,12 @@ class _ScanScreenState extends State<ScanScreen> {
                                   ),
                                 ),
                               ),
-                              const Positioned(
+                              Positioned(
                                 left: 24,
                                 right: 24,
                                 bottom: 24,
                                 child: Text(
-                                  'Camera preview placeholder for Member 2 scan module',
+                                  _cameraStatus,
                                   textAlign: TextAlign.center,
                                   style: TextStyle(color: Colors.white70),
                                 ),
