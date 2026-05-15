@@ -44,14 +44,7 @@ extension ScanStepPresentation on ScanStep {
 }
 
 class ScanController extends ChangeNotifier {
-  ScanController()
-      : _area = const ScannedAreaModel(
-          widthMeters: 2.5,
-          lengthMeters: 3.0,
-          leftBoundaryCaptured: false,
-          rightBoundaryCaptured: false,
-          lengthCaptured: false,
-        );
+  ScanController() : _area = ScannedAreaModel.defaults;
 
   static const List<double> widthOptions = [1.8, 2.2, 2.5, 2.8, 3.2];
 
@@ -65,6 +58,12 @@ class ScanController extends ChangeNotifier {
   bool get canCapture => _step != ScanStep.confirm;
   bool get canConfirm => _area.isReady && _step == ScanStep.confirm;
   double get progress => (_step.index + 1) / ScanStep.values.length;
+
+  void restoreSavedArea(ScannedAreaModel area) {
+    _area = area.markReady();
+    _step = ScanStep.confirm;
+    notifyListeners();
+  }
 
   void setWidth(double widthMeters) {
     _area = _area.copyWith(widthMeters: widthMeters);
@@ -115,13 +114,7 @@ class ScanController extends ChangeNotifier {
   }
 
   void reset() {
-    _area = const ScannedAreaModel(
-      widthMeters: 2.5,
-      lengthMeters: 3.0,
-      leftBoundaryCaptured: false,
-      rightBoundaryCaptured: false,
-      lengthCaptured: false,
-    );
+    _area = ScannedAreaModel.defaults;
     _step = ScanStep.left;
     notifyListeners();
   }

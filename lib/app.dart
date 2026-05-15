@@ -151,11 +151,15 @@ class _PhonePongAppState extends State<PhonePongApp> {
             sessionController: routeArgs.sessionController,
           );
         case Routes.game:
+          final args = settings.arguments;
+          final playArea = args is ScannedAreaModel ? args : null;
           final sessionController =
-              settings.arguments is MultiplayerSessionController
-                  ? settings.arguments as MultiplayerSessionController
-                  : null;
-          return GameScreen(a11y: _a11y, sessionController: sessionController);
+              args is MultiplayerSessionController ? args : null;
+          return GameScreen(
+            a11y: _a11y,
+            playArea: playArea,
+            sessionController: sessionController,
+          );
         case Routes.result:
           final args = settings.arguments as ResultArgs?;
           return ResultScreen(

@@ -1,3 +1,4 @@
+import 'package:camera/camera.dart' as camera;
 import 'package:flutter/material.dart';
 
 import '../../app.dart';
@@ -6,14 +7,15 @@ import '../../core/widgets/mario_block_card.dart';
 import '../../core/widgets/mario_button.dart';
 import '../../core/widgets/section_header.dart';
 import '../../theme/mario_theme.dart';
+import 'play_area_storage.dart';
 import 'scan_controller.dart';
 import 'scanned_area_model.dart';
 
-/// Simulated spatial scan flow.
+/// Camera-guided spatial scan flow.
 ///
-/// This MVP intentionally avoids real AR. Instead it guides the player through
-/// left / right / forward capture steps, lets them tune approximate dimensions,
-/// and outputs a usable virtual play area for later screens.
+/// This guides the player through left / right / forward capture steps, lets
+/// them tune approximate dimensions, and saves a usable virtual play area for
+/// later screens.
 class SpatialScanScreen extends StatefulWidget {
   const SpatialScanScreen({super.key, required this.a11y});
   final A11yController a11y;
@@ -23,25 +25,106 @@ class SpatialScanScreen extends StatefulWidget {
 }
 
 class _SpatialScanScreenState extends State<SpatialScanScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _progress;
   late final ScanController _controller;
+  final PlayAreaStorage _storage = const PlayAreaStorage();
+  camera.CameraController? _cameraController;
+  String? _cameraError;
+  bool _isCameraStarting = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _controller = ScanController();
     _progress = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 950),
     )..forward();
+    _loadSavedArea();
+    _initializeCamera();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _cameraController?.dispose();
     _progress.dispose();
     _controller.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive) {
+      _cameraController?.dispose();
+      _cameraController = null;
+      return;
+    }
+
+    if (state == AppLifecycleState.resumed) {
+      _initializeCamera();
+    }
+  }
+
+  Future<void> _loadSavedArea() async {
+    final saved = await _storage.load();
+    if (!mounted || saved == null) return;
+
+    _controller.restoreSavedArea(saved);
+    setState(() {});
+  }
+
+  Future<void> _initializeCamera() async {
+    if (_isCameraStarting) return;
+
+    _isCameraStarting = true;
+    try {
+      final cameras = await camera.availableCameras();
+      if (cameras.isEmpty) {
+        throw camera.CameraException('no_camera', 'No camera found');
+      }
+
+      final selected = cameras.firstWhere(
+        (description) =>
+            description.lensDirection == camera.CameraLensDirection.back,
+        orElse: () => cameras.first,
+      );
+      final controller = camera.CameraController(
+        selected,
+        camera.ResolutionPreset.high,
+        enableAudio: false,
+      );
+
+      await controller.initialize();
+      if (!mounted) {
+        await controller.dispose();
+        return;
+      }
+
+      await _cameraController?.dispose();
+      setState(() {
+        _cameraController = controller;
+        _cameraError = null;
+      });
+    } on camera.CameraException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _cameraError = switch (error.code) {
+          'CameraAccessDenied' ||
+          'CameraAccessDeniedWithoutPrompt' =>
+            'Camera permission is blocked. Allow camera access to scan the play area.',
+          'no_camera' => 'No camera found on this device.',
+          _ => 'Camera failed to start. ${error.description ?? error.code}',
+        };
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _cameraError = 'Camera failed to start. $error');
+    } finally {
+      _isCameraStarting = false;
+    }
   }
 
   void _restartScanSweep() {
@@ -64,6 +147,18 @@ class _SpatialScanScreenState extends State<SpatialScanScreen>
       _restartScanSweep();
     }
     setState(() {});
+  }
+
+  Future<void> _confirmPlayArea() async {
+    final area = _controller.area.markReady();
+    await _storage.save(area);
+    if (!mounted) return;
+
+    Navigator.pushReplacementNamed(
+      context,
+      Routes.calibration,
+      arguments: area,
+    );
   }
 
   String get _title => switch (_controller.step) {
@@ -122,11 +217,14 @@ class _SpatialScanScreenState extends State<SpatialScanScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _CameraStubFrame(
+                      _CameraPreviewFrame(
                         step: _controller.step,
                         icon: _icon,
                         progress: _progress,
                         area: area,
+                        cameraController: _cameraController,
+                        cameraError: _cameraError,
+                        onRetryCamera: _initializeCamera,
                       ),
                       const SizedBox(height: MarioSpacing.md),
                       MarioBlockCard(
@@ -198,11 +296,7 @@ class _SpatialScanScreenState extends State<SpatialScanScreen>
                           ? MarioColors.pipe
                           : MarioColors.marioRed,
                       onPressed: _controller.step == ScanStep.confirm
-                          ? () => Navigator.pushReplacementNamed(
-                                context,
-                                Routes.calibration,
-                                arguments: area,
-                              )
+                          ? _confirmPlayArea
                           : _capture,
                     ),
                   ),
@@ -246,18 +340,24 @@ class _OverallProgressBar extends StatelessWidget {
   }
 }
 
-class _CameraStubFrame extends StatelessWidget {
-  const _CameraStubFrame({
+class _CameraPreviewFrame extends StatelessWidget {
+  const _CameraPreviewFrame({
     required this.step,
     required this.icon,
     required this.progress,
     required this.area,
+    required this.cameraController,
+    required this.cameraError,
+    required this.onRetryCamera,
   });
 
   final ScanStep step;
   final IconData icon;
   final AnimationController progress;
   final ScannedAreaModel area;
+  final camera.CameraController? cameraController;
+  final String? cameraError;
+  final VoidCallback onRetryCamera;
 
   @override
   Widget build(BuildContext context) {
@@ -276,6 +376,11 @@ class _CameraStubFrame extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
+                _CameraSurface(
+                  controller: cameraController,
+                  error: cameraError,
+                  onRetry: onRetryCamera,
+                ),
                 CustomPaint(painter: _ScanGridPainter(progress.value)),
                 Center(
                   child: Column(
@@ -301,6 +406,70 @@ class _CameraStubFrame extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _CameraSurface extends StatelessWidget {
+  const _CameraSurface({
+    required this.controller,
+    required this.error,
+    required this.onRetry,
+  });
+
+  final camera.CameraController? controller;
+  final String? error;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final cameraController = controller;
+    if (cameraController != null && cameraController.value.isInitialized) {
+      return FittedBox(
+        fit: BoxFit.cover,
+        child: SizedBox(
+          width: cameraController.value.previewSize?.height ?? 1,
+          height: cameraController.value.previewSize?.width ?? 1,
+          child: camera.CameraPreview(cameraController),
+        ),
+      );
+    }
+
+    if (error != null) {
+      return Container(
+        color: MarioColors.bowserBlack,
+        padding: const EdgeInsets.all(MarioSpacing.md),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.videocam_off_rounded,
+              color: MarioColors.coin,
+              size: 42,
+            ),
+            const SizedBox(height: MarioSpacing.xs),
+            Text(
+              error!,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: MarioColors.cloudWhite),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: MarioSpacing.sm),
+            OutlinedButton(
+              onPressed: onRetry,
+              child: const Text('Retry camera'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      color: MarioColors.bowserBlack,
+      alignment: Alignment.center,
+      child: const CircularProgressIndicator(color: MarioColors.coin),
     );
   }
 }

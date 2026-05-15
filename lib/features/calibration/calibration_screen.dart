@@ -190,7 +190,11 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
                 onPressed: _normalDone && _smashDone
                     ? () {
                         if (widget.sessionController == null) {
-                          Navigator.pushReplacementNamed(context, Routes.game);
+                          Navigator.pushReplacementNamed(
+                            context,
+                            Routes.game,
+                            arguments: widget.playArea,
+                          );
                           return;
                         }
                         if (_submitted) {

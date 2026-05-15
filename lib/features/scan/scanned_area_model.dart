@@ -13,6 +13,14 @@ class ScannedAreaModel {
   final bool rightBoundaryCaptured;
   final bool lengthCaptured;
 
+  static const defaults = ScannedAreaModel(
+    widthMeters: 2.5,
+    lengthMeters: 3.0,
+    leftBoundaryCaptured: false,
+    rightBoundaryCaptured: false,
+    lengthCaptured: false,
+  );
+
   bool get isReady =>
       leftBoundaryCaptured && rightBoundaryCaptured && lengthCaptured;
   double get playAreaSizeSquareMeters =>
@@ -54,14 +62,30 @@ class ScannedAreaModel {
     };
   }
 
-  factory ScannedAreaModel.fromJson(Map<String, dynamic> json) {
+  factory ScannedAreaModel.fromJson(Map<String, Object?> json) {
     return ScannedAreaModel(
-      widthMeters: (json['widthMeters'] as num?)?.toDouble() ?? 2.5,
-      lengthMeters: (json['lengthMeters'] as num?)?.toDouble() ?? 3.0,
-      leftBoundaryCaptured: json['leftBoundaryCaptured'] as bool? ?? false,
-      rightBoundaryCaptured: json['rightBoundaryCaptured'] as bool? ?? false,
-      lengthCaptured: json['lengthCaptured'] as bool? ?? false,
+      widthMeters: _readDouble(json['widthMeters'], defaults.widthMeters),
+      lengthMeters: _readDouble(json['lengthMeters'], defaults.lengthMeters),
+      leftBoundaryCaptured:
+          json['leftBoundaryCaptured'] as bool? ?? defaults.leftBoundaryCaptured,
+      rightBoundaryCaptured: json['rightBoundaryCaptured'] as bool? ??
+          defaults.rightBoundaryCaptured,
+      lengthCaptured:
+          json['lengthCaptured'] as bool? ?? defaults.lengthCaptured,
     );
+  }
+
+  ScannedAreaModel markReady() {
+    return copyWith(
+      leftBoundaryCaptured: true,
+      rightBoundaryCaptured: true,
+      lengthCaptured: true,
+    );
+  }
+
+  static double _readDouble(Object? value, double fallback) {
+    if (value is num) return value.toDouble();
+    return fallback;
   }
 
   static double _roundToTenth(double value) =>
