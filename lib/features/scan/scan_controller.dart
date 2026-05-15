@@ -4,6 +4,45 @@ import 'scanned_area_model.dart';
 
 enum ScanStep { left, right, length, confirm }
 
+extension ScanStepPresentation on ScanStep {
+  String get title => switch (this) {
+        ScanStep.left => 'Scan Left Boundary',
+        ScanStep.right => 'Set Play Area Width',
+        ScanStep.length => 'Set Court Length',
+        ScanStep.confirm => 'Confirm Play Area',
+      };
+
+  String get subtitle => switch (this) {
+        ScanStep.left =>
+          'Stand at the safe left edge of the room and capture that boundary first.',
+        ScanStep.right =>
+          'Choose the width that best matches the space you can safely swing through.',
+        ScanStep.length =>
+          'Set how deep the rally lane should feel before locking it in.',
+        ScanStep.confirm =>
+          'Review the virtual court and confirm it before calibration.',
+      };
+
+  String get progressLabel => switch (this) {
+        ScanStep.left => 'Left boundary',
+        ScanStep.right => 'Width',
+        ScanStep.length => 'Length',
+        ScanStep.confirm => 'Ready',
+      };
+
+  String get previewLabel => switch (this) {
+        ScanStep.left => 'Capturing the left safety boundary.',
+        ScanStep.right => 'Dialing in the full side-to-side play width.',
+        ScanStep.length => 'Adjusting forward depth for incoming shots.',
+        ScanStep.confirm => 'The shared court is ready for calibration.',
+      };
+
+  static ScanStep fromName(String raw) {
+    return ScanStep.values.where((step) => step.name == raw).firstOrNull ??
+        ScanStep.left;
+  }
+}
+
 class ScanController extends ChangeNotifier {
   ScanController()
       : _area = const ScannedAreaModel(
@@ -84,62 +123,6 @@ class ScanController extends ChangeNotifier {
       lengthCaptured: false,
     );
     _step = ScanStep.left;
-    notifyListeners();
-  }
-}
-
-import 'package:flutter/foundation.dart';
-
-import 'scanned_area_model.dart';
-
-class ScanController extends ChangeNotifier {
-  ScanController({ScannedAreaModel? initialArea, ScanStep? initialStep})
-      : _area = initialArea ??
-            const ScannedAreaModel(
-              leftReachMeters: 1.2,
-              rightReachMeters: 1.3,
-              lengthMeters: 3.0,
-            ),
-        _currentStep = initialStep ?? ScanStep.leftBoundary;
-
-  ScanStep _currentStep;
-  ScannedAreaModel _area;
-
-  ScanStep get currentStep => _currentStep;
-  ScannedAreaModel get area => _area;
-
-  double get progress => (_currentStep.index + 1) / ScanStep.values.length;
-
-  void updateLeftReach(double value) {
-    _area = _area.copyWith(leftReachMeters: value);
-    notifyListeners();
-  }
-
-  void updateRightReach(double value) {
-    _area = _area.copyWith(rightReachMeters: value);
-    notifyListeners();
-  }
-
-  void updateLength(double value) {
-    _area = _area.copyWith(lengthMeters: value);
-    notifyListeners();
-  }
-
-  void nextStep() {
-    if (_currentStep == ScanStep.confirm) {
-      return;
-    }
-
-    _currentStep = ScanStep.values[_currentStep.index + 1];
-    notifyListeners();
-  }
-
-  void previousStep() {
-    if (_currentStep == ScanStep.leftBoundary) {
-      return;
-    }
-
-    _currentStep = ScanStep.values[_currentStep.index - 1];
     notifyListeners();
   }
 }

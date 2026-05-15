@@ -22,14 +22,12 @@ class _ScanScreenState extends State<ScanScreen> {
   bool _navigated = false;
 
   bool get _isMultiplayer => widget.multiplayerSession != null;
-
   bool get _isHost => widget.multiplayerSession?.state.isHost ?? false;
-
   Listenable get _listenable => widget.multiplayerSession ?? _localController!;
 
   ScanStep get _currentStep => _isMultiplayer
       ? widget.multiplayerSession!.state.sharedScanState.step
-      : _localController!.currentStep;
+      : _localController!.step;
 
   ScannedAreaModel get _area => _isMultiplayer
       ? widget.multiplayerSession!.state.sharedScanState.area
@@ -60,19 +58,16 @@ class _ScanScreenState extends State<ScanScreen> {
         if (sessionState?.sharedScanState.confirmed == true && !_navigated) {
           _navigated = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted) {
-              return;
+            if (mounted) {
+              widget.onScanComplete(_area);
             }
-            widget.onScanComplete(_area);
           });
         }
 
         return Scaffold(
           appBar: AppBar(
             title: Text(
-              _isMultiplayer
-                  ? 'Shared Spatial Creation'
-                  : 'Scan Your Play Area',
+              _isMultiplayer ? 'Shared Spatial Setup' : 'Scan Your Play Area',
             ),
           ),
           body: SafeArea(
@@ -82,9 +77,7 @@ class _ScanScreenState extends State<ScanScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _isMultiplayer
-                        ? 'Shared Spatial Creation'
-                        : 'Scan Your Play Area',
+                    _currentStep.title,
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
@@ -96,22 +89,6 @@ class _ScanScreenState extends State<ScanScreen> {
                       context,
                     ).textTheme.bodyLarge?.copyWith(color: Colors.black54),
                   ),
-                  const SizedBox(height: 24),
-                  _InfoCard(
-                    title: _isMultiplayer
-                        ? 'Multiplayer scan mode'
-                        : 'Hackathon scan mode',
-                    body: _isMultiplayer
-                        ? _multiplayerInfoBody(sessionState)
-                        : 'This simulated camera flow lets Member 2 demo the spatial setup without live depth mapping. The important part is the guided preparation of a believable play area.',
-                  ),
-                  if (sessionState?.disconnectReason != null) ...[
-                    const SizedBox(height: 16),
-                    _InfoCard(
-                      title: 'Session closed',
-                      body: sessionState!.disconnectReason!,
-                    ),
-                  ],
                   const SizedBox(height: 24),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(999),
@@ -125,7 +102,6 @@ class _ScanScreenState extends State<ScanScreen> {
                   Wrap(
                     spacing: 12,
                     runSpacing: 12,
-                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(
                         'Step ${_currentStep.index + 1} of ${ScanStep.values.length}',
@@ -141,37 +117,17 @@ class _ScanScreenState extends State<ScanScreen> {
                     ],
                   ),
                   const SizedBox(height: 24),
-                  _ScanPreviewCard(currentStep: _currentStep, area: _area),
-                  const SizedBox(height: 16),
-                  _buildControls(context, _currentStep, _area),
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: [
-                      Chip(
-                        avatar: const Icon(Icons.straighten_rounded, size: 18),
-                        label: Text(
-                          'Width ${_area.widthMeters.toStringAsFixed(1)} m',
-                        ),
-                      ),
-                      Chip(
-                        avatar: const Icon(
-                          Icons.open_in_full_rounded,
-                          size: 18,
-                        ),
-                        label: Text(
-                          'Length ${_area.lengthMeters.toStringAsFixed(1)} m',
-                        ),
-                      ),
-                      Chip(
-                        avatar: const Icon(Icons.square_foot_rounded, size: 18),
-                        label: Text(
-                          'Area ${_area.playAreaSizeSquareMeters.toStringAsFixed(1)} m²',
-                        ),
-                      ),
-                    ],
+                  _InfoCard(
+                    title:
+                        _isMultiplayer ? 'Shared scan status' : 'Scan status',
+                    body: _isMultiplayer && !_isHost
+                        ? 'The host is driving the shared setup. Your phone mirrors each step and will advance when the host confirms the court.'
+                        : _currentStep.previewLabel,
                   ),
+                  const SizedBox(height: 16),
+                  _SummaryCard(area: _area),
+                  const SizedBox(height: 16),
+                  _buildControls(),
                 ],
               ),
             ),
@@ -181,132 +137,92 @@ class _ScanScreenState extends State<ScanScreen> {
     );
   }
 
-  String _multiplayerInfoBody(dynamic sessionState) {
-    if (_isHost) {
-      return 'Both phones are connected. You are the host, so your scan controls drive the shared play area. The other phone mirrors each step and will move forward when you confirm the space.';
-    }
-
-    return 'The host is creating the shared play area now. Your phone mirrors the host scan so both players stay aligned before local calibration starts.';
-  }
-
-  Widget _buildControls(
-    BuildContext context,
-    ScanStep currentStep,
-    ScannedAreaModel area,
-  ) {
+  Widget _buildControls() {
     if (_isMultiplayer && !_isHost) {
-      return _buildJoinerMirror(currentStep, area);
+      return const _InfoCard(
+        title: 'Waiting on host',
+        body:
+            'This phone will stay in sync automatically while the host captures the shared play area.',
+      );
     }
 
-    switch (currentStep) {
-      case ScanStep.leftBoundary:
+    switch (_currentStep) {
+      case ScanStep.left:
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _MetricCard(
-              label: 'Left boundary reach',
-              value: '${area.leftReachMeters.toStringAsFixed(1)} m',
-              child: Slider(
-                value: area.leftReachMeters,
-                min: 0.8,
-                max: 2.0,
-                divisions: 24,
-                label: '${area.leftReachMeters.toStringAsFixed(1)} m',
-                onChanged: _isMultiplayer
-                    ? widget.multiplayerSession!.updateLeftReach
-                    : _localController!.updateLeftReach,
-              ),
+            _ChecklistCard(
+              title: 'Left boundary',
+              body:
+                  'Move to the left-most safe swing position and capture that edge first.',
+              ready: _area.leftBoundaryCaptured,
             ),
             const SizedBox(height: 16),
             FilledButton(
-              onPressed: _isMultiplayer
-                  ? widget.multiplayerSession!.nextScanStep
-                  : _localController!.nextStep,
-              child: Text(
-                _isMultiplayer ? 'Lock Left Boundary' : 'Scan Left Boundary',
-              ),
+              onPressed: _captureCurrentStep,
+              child: const Text('Capture Left Boundary'),
             ),
           ],
         );
-      case ScanStep.rightBoundary:
+      case ScanStep.right:
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _MetricCard(
-              label: 'Right boundary reach',
-              value: '${area.rightReachMeters.toStringAsFixed(1)} m',
+              label: 'Play area width',
+              value: '${_area.widthMeters.toStringAsFixed(1)} m',
               child: Slider(
-                value: area.rightReachMeters,
-                min: 0.8,
-                max: 2.0,
-                divisions: 24,
-                label: '${area.rightReachMeters.toStringAsFixed(1)} m',
-                onChanged: _isMultiplayer
-                    ? widget.multiplayerSession!.updateRightReach
-                    : _localController!.updateRightReach,
+                value: _area.widthMeters,
+                min: ScanController.widthOptions.first,
+                max: ScanController.widthOptions.last,
+                divisions: 14,
+                label: '${_area.widthMeters.toStringAsFixed(1)} m',
+                onChanged: _setWidth,
               ),
             ),
             const SizedBox(height: 16),
             Row(
               children: [
                 OutlinedButton(
-                  onPressed: _isMultiplayer
-                      ? widget.multiplayerSession!.previousScanStep
-                      : _localController!.previousStep,
+                  onPressed: _goBack,
                   child: const Text('Back'),
                 ),
                 const SizedBox(width: 12),
                 FilledButton(
-                  onPressed: _isMultiplayer
-                      ? widget.multiplayerSession!.nextScanStep
-                      : _localController!.nextStep,
-                  child: Text(
-                    _isMultiplayer
-                        ? 'Lock Right Boundary'
-                        : 'Scan Right Boundary',
-                  ),
+                  onPressed: _captureCurrentStep,
+                  child: const Text('Lock Width'),
                 ),
               ],
             ),
           ],
         );
-      case ScanStep.forwardLength:
+      case ScanStep.length:
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _MetricCard(
-              label: 'Forward length',
-              value: '${area.lengthMeters.toStringAsFixed(1)} m',
+              label: 'Court length',
+              value: '${_area.lengthMeters.toStringAsFixed(1)} m',
               child: Slider(
-                value: area.lengthMeters,
+                value: _area.lengthMeters,
                 min: 2.0,
                 max: 5.0,
                 divisions: 30,
-                label: '${area.lengthMeters.toStringAsFixed(1)} m',
-                onChanged: _isMultiplayer
-                    ? widget.multiplayerSession!.updateLength
-                    : _localController!.updateLength,
+                label: '${_area.lengthMeters.toStringAsFixed(1)} m',
+                onChanged: _setLength,
               ),
             ),
             const SizedBox(height: 16),
             Row(
               children: [
                 OutlinedButton(
-                  onPressed: _isMultiplayer
-                      ? widget.multiplayerSession!.previousScanStep
-                      : _localController!.previousStep,
+                  onPressed: _goBack,
                   child: const Text('Back'),
                 ),
                 const SizedBox(width: 12),
                 FilledButton(
-                  onPressed: _isMultiplayer
-                      ? widget.multiplayerSession!.nextScanStep
-                      : _localController!.nextStep,
-                  child: Text(
-                    _isMultiplayer
-                        ? 'Lock Forward Length'
-                        : 'Scan Forward Length',
-                  ),
+                  onPressed: _captureCurrentStep,
+                  child: const Text('Lock Length'),
                 ),
               ],
             ),
@@ -316,32 +232,25 @@ class _ScanScreenState extends State<ScanScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _InfoCard(
-              title:
-                  _isMultiplayer ? 'Shared play area ready' : 'Play area ready',
+            const _InfoCard(
+              title: 'Play area ready',
               body:
-                  'Width ${area.widthMeters.toStringAsFixed(1)} m, length ${area.lengthMeters.toStringAsFixed(1)} m, play area ${area.playAreaSizeSquareMeters.toStringAsFixed(1)} m². '
-                  '${_isMultiplayer ? 'Confirm this shared space to move both phones into calibration.' : 'This setup is ready to pass into calibration and gameplay.'}',
+                  'The boundaries and dimensions are captured. Confirm this court to continue into calibration.',
             ),
             const SizedBox(height: 16),
             Row(
               children: [
                 OutlinedButton(
-                  onPressed: _isMultiplayer
-                      ? widget.multiplayerSession!.previousScanStep
-                      : _localController!.previousStep,
-                  child:
-                      Text(_isMultiplayer ? 'Adjust Shared Space' : 'Adjust'),
+                  onPressed: _goBack,
+                  child: const Text('Adjust'),
                 ),
                 const SizedBox(width: 12),
                 FilledButton(
-                  onPressed: _isMultiplayer
-                      ? widget.multiplayerSession!.confirmSharedScan
-                      : () => widget.onScanComplete(area),
+                  onPressed: _confirm,
                   child: Text(
                     _isMultiplayer
                         ? 'Confirm Shared Space'
-                        : 'Start Game Setup',
+                        : 'Start Calibration',
                   ),
                 ),
               ],
@@ -351,157 +260,132 @@ class _ScanScreenState extends State<ScanScreen> {
     }
   }
 
-  Widget _buildJoinerMirror(ScanStep currentStep, ScannedAreaModel area) {
-    final title = currentStep == ScanStep.confirm
-        ? 'Waiting for host confirmation'
-        : 'Waiting for host scan input';
-    final body = currentStep == ScanStep.confirm
-        ? 'The host is reviewing the shared play area now. Both phones will move to calibration after the host confirms the shared space.'
-        : 'The host is controlling the sliders and scan steps. Your phone mirrors the shared spatial-creation progress so the multiplayer setup stays in sync.';
+  void _setWidth(double value) {
+    if (_isMultiplayer) {
+      widget.multiplayerSession!.setWidth(value);
+    } else {
+      _localController!.setWidth(value);
+    }
+  }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _InfoCard(title: title, body: body),
-        const SizedBox(height: 16),
-        _MetricCard(
-          label: 'Left boundary reach',
-          value: '${area.leftReachMeters.toStringAsFixed(1)} m',
-          child: Slider(
-            value: area.leftReachMeters,
-            min: 0.8,
-            max: 2.0,
-            divisions: 24,
-            onChanged: null,
-          ),
-        ),
-        const SizedBox(height: 16),
-        _MetricCard(
-          label: 'Right boundary reach',
-          value: '${area.rightReachMeters.toStringAsFixed(1)} m',
-          child: Slider(
-            value: area.rightReachMeters,
-            min: 0.8,
-            max: 2.0,
-            divisions: 24,
-            onChanged: null,
-          ),
-        ),
-        const SizedBox(height: 16),
-        _MetricCard(
-          label: 'Forward length',
-          value: '${area.lengthMeters.toStringAsFixed(1)} m',
-          child: Slider(
-            value: area.lengthMeters,
-            min: 2.0,
-            max: 5.0,
-            divisions: 30,
-            onChanged: null,
-          ),
-        ),
-      ],
-    );
+  void _setLength(double value) {
+    if (_isMultiplayer) {
+      widget.multiplayerSession!.setLength(value);
+    } else {
+      _localController!.setLength(value);
+    }
+  }
+
+  void _captureCurrentStep() {
+    if (_isMultiplayer) {
+      widget.multiplayerSession!.captureCurrentStep();
+    } else {
+      _localController!.captureCurrentStep();
+    }
+  }
+
+  void _goBack() {
+    if (_isMultiplayer) {
+      widget.multiplayerSession!.goBack();
+    } else {
+      _localController!.goBack();
+    }
+  }
+
+  void _confirm() {
+    if (_isMultiplayer) {
+      widget.multiplayerSession!.confirmSharedScan();
+    } else {
+      widget.onScanComplete(_area);
+    }
   }
 }
 
-class _ScanPreviewCard extends StatelessWidget {
-  const _ScanPreviewCard({required this.currentStep, required this.area});
+class _SummaryCard extends StatelessWidget {
+  const _SummaryCard({required this.area});
 
-  final ScanStep currentStep;
   final ScannedAreaModel area;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final highlightColor = theme.colorScheme.primary;
-    final previewColor = highlightColor.withValues(alpha: 0.12);
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: highlightColor.withValues(alpha: 0.18)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(Icons.videocam_rounded, color: highlightColor),
-              const SizedBox(width: 10),
-              Text(
-                'Simulated scan preview',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Container(
-            height: 180,
-            decoration: BoxDecoration(
-              color: previewColor,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Stack(
-              children: [
-                Align(
-                  child: Container(
-                    width: 160,
-                    height: 110,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: highlightColor.withValues(alpha: 0.55),
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                ),
-                Align(
-                  alignment: _alignmentForStep(currentStep),
-                  child: Container(
-                    width: currentStep == ScanStep.forwardLength ? 120 : 12,
-                    height: currentStep == ScanStep.forwardLength ? 12 : 120,
-                    decoration: BoxDecoration(
-                      color: highlightColor,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
           Text(
-            currentStep.previewLabel,
-            style: theme.textTheme.bodyLarge?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+            'Current estimate',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
-          const SizedBox(height: 6),
-          Text(
-            'Current estimate: ${area.widthMeters.toStringAsFixed(1)} m wide, ${area.lengthMeters.toStringAsFixed(1)} m deep.',
+          const SizedBox(height: 12),
+          Text('Width ${area.widthMeters.toStringAsFixed(1)} m'),
+          Text('Length ${area.lengthMeters.toStringAsFixed(1)} m'),
+          Text('Area ${area.playAreaSizeSquareMeters.toStringAsFixed(1)} m²'),
+          const SizedBox(height: 12),
+          _CaptureState(
+            label: 'Left boundary',
+            ready: area.leftBoundaryCaptured,
           ),
+          _CaptureState(
+            label: 'Right boundary',
+            ready: area.rightBoundaryCaptured,
+          ),
+          _CaptureState(label: 'Length', ready: area.lengthCaptured),
         ],
       ),
     );
   }
+}
 
-  Alignment _alignmentForStep(ScanStep step) {
-    switch (step) {
-      case ScanStep.leftBoundary:
-        return Alignment.centerLeft;
-      case ScanStep.rightBoundary:
-        return Alignment.centerRight;
-      case ScanStep.forwardLength:
-        return Alignment.topCenter;
-      case ScanStep.confirm:
-        return Alignment.center;
-    }
+class _CaptureState extends StatelessWidget {
+  const _CaptureState({required this.label, required this.ready});
+
+  final String label;
+  final bool ready;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        children: [
+          Icon(
+            ready ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
+            size: 18,
+            color: ready ? Colors.green : Colors.black45,
+          ),
+          const SizedBox(width: 8),
+          Text('$label ${ready ? 'captured' : 'pending'}'),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChecklistCard extends StatelessWidget {
+  const _ChecklistCard({
+    required this.title,
+    required this.body,
+    required this.ready,
+  });
+
+  final String title;
+  final String body;
+  final bool ready;
+
+  @override
+  Widget build(BuildContext context) {
+    return _InfoCard(
+      title: title,
+      body: '$body ${ready ? 'Captured.' : 'Pending capture.'}',
+    );
   }
 }
 
@@ -513,8 +397,6 @@ class _InfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -527,12 +409,12 @@ class _InfoCard extends StatelessWidget {
         children: [
           Text(
             title,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 8),
-          Text(body, style: theme.textTheme.bodyMedium),
+          Text(body, style: Theme.of(context).textTheme.bodyMedium),
         ],
       ),
     );

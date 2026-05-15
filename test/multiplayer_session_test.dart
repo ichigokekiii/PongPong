@@ -59,25 +59,27 @@ void main() {
     await joiner.joinSession(host.payload!);
     await _waitUntil(() => host.state.isConnected && joiner.state.isConnected);
 
-    host.updateLeftReach(1.7);
-    host.updateRightReach(1.5);
-    host.updateLength(4.0);
-    host.nextScanStep();
+    host.captureCurrentStep();
+    host.setWidth(2.8);
+    host.captureCurrentStep();
+    host.setLength(4.0);
+    host.captureCurrentStep();
 
     await _waitUntil(
       () =>
-          joiner.state.sharedScanState.area.leftReachMeters == 1.7 &&
-          joiner.state.sharedScanState.area.rightReachMeters == 1.5 &&
+          joiner.state.sharedScanState.area.leftBoundaryCaptured &&
+          joiner.state.sharedScanState.area.rightBoundaryCaptured &&
           joiner.state.sharedScanState.area.lengthMeters == 4.0 &&
+          joiner.state.sharedScanState.area.widthMeters == 2.8 &&
           joiner.state.sharedScanState.step == host.state.sharedScanState.step,
     );
 
-    final mirroredLeft = joiner.state.sharedScanState.area.leftReachMeters;
-    joiner.updateLeftReach(0.9);
+    final mirroredWidth = joiner.state.sharedScanState.area.widthMeters;
+    joiner.setWidth(1.8);
     await Future<void>.delayed(const Duration(milliseconds: 150));
 
-    expect(host.state.sharedScanState.area.leftReachMeters, 1.7);
-    expect(joiner.state.sharedScanState.area.leftReachMeters, mirroredLeft);
+    expect(host.state.sharedScanState.area.widthMeters, 2.8);
+    expect(joiner.state.sharedScanState.area.widthMeters, mirroredWidth);
 
     await host.closeSession(reason: 'Test complete.');
   });

@@ -5,7 +5,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:pongpong/features/multiplayer/multiplayer_models.dart';
-import 'package:pongpong/features/scan/scanned_area_model.dart';
+import 'package:pongpong/features/scan/scan_controller.dart';
 
 class MultiplayerSessionController extends ChangeNotifier {
   MultiplayerSessionController({
@@ -108,31 +108,19 @@ class MultiplayerSessionController extends ChangeNotifier {
     await joinSession(_lastJoinPayload!);
   }
 
-  void updateLeftReach(double value) {
+  void setWidth(double value) {
     if (!_state.canControlScan) {
       return;
     }
 
     _pushSharedScan(
       _state.sharedScanState.copyWith(
-        area: _state.sharedScanState.area.copyWith(leftReachMeters: value),
+        area: _state.sharedScanState.area.copyWith(widthMeters: value),
       ),
     );
   }
 
-  void updateRightReach(double value) {
-    if (!_state.canControlScan) {
-      return;
-    }
-
-    _pushSharedScan(
-      _state.sharedScanState.copyWith(
-        area: _state.sharedScanState.area.copyWith(rightReachMeters: value),
-      ),
-    );
-  }
-
-  void updateLength(double value) {
+  void setLength(double value) {
     if (!_state.canControlScan) {
       return;
     }
@@ -144,7 +132,7 @@ class MultiplayerSessionController extends ChangeNotifier {
     );
   }
 
-  void nextScanStep() {
+  void captureCurrentStep() {
     if (!_state.canControlScan) {
       return;
     }
@@ -154,20 +142,33 @@ class MultiplayerSessionController extends ChangeNotifier {
       return;
     }
 
-    _pushSharedScan(
-      _state.sharedScanState.copyWith(
-        step: ScanStep.values[step.index + 1],
-      ),
-    );
+    final area = _state.sharedScanState.area;
+    final nextState = switch (step) {
+      ScanStep.left => _state.sharedScanState.copyWith(
+          step: ScanStep.right,
+          area: area.copyWith(leftBoundaryCaptured: true),
+        ),
+      ScanStep.right => _state.sharedScanState.copyWith(
+          step: ScanStep.length,
+          area: area.copyWith(rightBoundaryCaptured: true),
+        ),
+      ScanStep.length => _state.sharedScanState.copyWith(
+          step: ScanStep.confirm,
+          area: area.copyWith(lengthCaptured: true),
+        ),
+      ScanStep.confirm => _state.sharedScanState,
+    };
+
+    _pushSharedScan(nextState);
   }
 
-  void previousScanStep() {
+  void goBack() {
     if (!_state.canControlScan) {
       return;
     }
 
     final step = _state.sharedScanState.step;
-    if (step == ScanStep.leftBoundary) {
+    if (step == ScanStep.left) {
       return;
     }
 

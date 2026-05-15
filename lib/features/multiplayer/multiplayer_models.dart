@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:pongpong/features/scan/scan_controller.dart';
 import 'package:pongpong/features/scan/scanned_area_model.dart';
 
 enum SessionRole { host, joiner }
@@ -170,11 +171,13 @@ class MultiplayerSessionState {
 
   static const initial = MultiplayerSessionState(
     sharedScanState: SharedScanState(
-      step: ScanStep.leftBoundary,
+      step: ScanStep.left,
       area: ScannedAreaModel(
-        leftReachMeters: 1.2,
-        rightReachMeters: 1.3,
+        widthMeters: 2.5,
         lengthMeters: 3.0,
+        leftBoundaryCaptured: false,
+        rightBoundaryCaptured: false,
+        lengthCaptured: false,
       ),
     ),
   );

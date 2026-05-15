@@ -11,6 +11,7 @@ import 'features/multiplayer/multiplayer_setup_screen.dart';
 import 'features/results/result_screen.dart';
 import 'features/safety/safety_screen.dart';
 import 'features/scan/scanned_area_model.dart';
+import 'features/scan/scan_screen.dart';
 import 'features/scan/spatial_scan_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'theme/mario_theme.dart';
@@ -31,6 +32,16 @@ class Routes {
 }
 
 typedef SessionControllerFactory = MultiplayerSessionController Function();
+
+class CalibrationRouteArgs {
+  const CalibrationRouteArgs({
+    this.playArea,
+    this.sessionController,
+  });
+
+  final ScannedAreaModel? playArea;
+  final MultiplayerSessionController? sessionController;
+}
 
 class PhonePongApp extends StatefulWidget {
   const PhonePongApp({
@@ -109,19 +120,36 @@ class _PhonePongAppState extends State<PhonePongApp> {
               settings.arguments is MultiplayerSessionController
                   ? settings.arguments as MultiplayerSessionController
                   : null;
+          if (sessionController == null) {
+            return SpatialScanScreen(a11y: _a11y);
+          }
           return Builder(
             builder: (context) => ScanScreen(
               multiplayerSession: sessionController,
-              onScanComplete: (_) => Navigator.pushReplacementNamed(
+              onScanComplete: (area) => Navigator.pushReplacementNamed(
                 context,
                 Routes.calibration,
-                arguments: sessionController,
+                arguments: CalibrationRouteArgs(
+                  playArea: area,
+                  sessionController: sessionController,
+                ),
               ),
             ),
           );
         case Routes.calibration:
-          final args = settings.arguments as ScannedAreaModel?;
-          return CalibrationScreen(a11y: _a11y, playArea: args);
+          final args = settings.arguments;
+          final routeArgs = args is CalibrationRouteArgs
+              ? args
+              : args is ScannedAreaModel
+                  ? CalibrationRouteArgs(playArea: args)
+                  : args is MultiplayerSessionController
+                      ? CalibrationRouteArgs(sessionController: args)
+                      : const CalibrationRouteArgs();
+          return CalibrationScreen(
+            a11y: _a11y,
+            playArea: routeArgs.playArea,
+            sessionController: routeArgs.sessionController,
+          );
         case Routes.game:
           final sessionController =
               settings.arguments is MultiplayerSessionController

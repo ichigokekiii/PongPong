@@ -5,8 +5,8 @@ import '../../core/accessibility/a11y_controller.dart';
 import '../../core/widgets/mario_block_card.dart';
 import '../../core/widgets/mario_button.dart';
 import '../../core/widgets/section_header.dart';
-import '../multiplayer/multiplayer_session_controller.dart';
 import '../../theme/mario_theme.dart';
+import '../multiplayer/multiplayer_session_controller.dart';
 import '../scan/scanned_area_model.dart';
 
 /// Swing-strength calibration UI. Sensor logic is Member 3's job — this only
@@ -16,9 +16,11 @@ class CalibrationScreen extends StatefulWidget {
     super.key,
     required this.a11y,
     this.playArea,
+    this.sessionController,
   });
   final A11yController a11y;
   final ScannedAreaModel? playArea;
+  final MultiplayerSessionController? sessionController;
 
   @override
   State<CalibrationScreen> createState() => _CalibrationScreenState();
