@@ -38,7 +38,7 @@ class _SafetyScreenState extends State<SafetyScreen> {
                 title: 'Clear the\nbattlefield!',
               ),
               const SizedBox(height: MarioSpacing.md),
-              MarioBlockCard(
+              const MarioBlockCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [

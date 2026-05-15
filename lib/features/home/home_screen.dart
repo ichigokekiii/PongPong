@@ -158,13 +158,14 @@ class HomeScreen extends StatelessWidget {
               children: [
                 Text('HOW TO PLAY', style: t.headlineMedium),
                 const SizedBox(height: MarioSpacing.sm),
-                _Tip(emoji: '1.', text: 'Scan your play area with the camera.'),
-                _Tip(emoji: '2.', text: 'Calibrate your swing strength.'),
-                _Tip(
+                const _Tip(
+                    emoji: '1.', text: 'Scan your play area with the camera.'),
+                const _Tip(emoji: '2.', text: 'Calibrate your swing strength.'),
+                const _Tip(
                   emoji: '3.',
                   text: 'Watch screen color: RED far, YELLOW near, GREEN swing!',
                 ),
-                _Tip(
+                const _Tip(
                   emoji: '4.',
                   text: 'Hard swing on GREEN = SMASH for bonus points.',
                 ),
