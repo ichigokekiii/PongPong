@@ -7,6 +7,7 @@ import '../../core/widgets/mario_button.dart';
 import '../../core/widgets/section_header.dart';
 import '../multiplayer/multiplayer_session_controller.dart';
 import '../../theme/mario_theme.dart';
+import '../scan/scanned_area_model.dart';
 
 /// Swing-strength calibration UI. Sensor logic is Member 3's job — this only
 /// shows the guided flow + UI mock for normal / smash thresholds.
@@ -14,10 +15,10 @@ class CalibrationScreen extends StatefulWidget {
   const CalibrationScreen({
     super.key,
     required this.a11y,
-    this.sessionController,
+    this.playArea,
   });
   final A11yController a11y;
-  final MultiplayerSessionController? sessionController;
+  final ScannedAreaModel? playArea;
 
   @override
   State<CalibrationScreen> createState() => _CalibrationScreenState();
@@ -92,6 +93,10 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
                 child: SingleChildScrollView(
                   child: Column(
                     children: [
+                      if (widget.playArea != null) ...[
+                        _PlayAreaSummary(area: widget.playArea!),
+                        const SizedBox(height: MarioSpacing.sm),
+                      ],
                       _CalibTile(
                         icon: Icons.sports_tennis_rounded,
                         title: 'Normal swing',
@@ -198,6 +203,36 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _PlayAreaSummary extends StatelessWidget {
+  const _PlayAreaSummary({required this.area});
+
+  final ScannedAreaModel area;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return MarioBlockCard(
+      background: MarioColors.coin,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Scanned play area', style: t.titleMedium),
+          const SizedBox(height: MarioSpacing.xxs),
+          Text(
+            'Width ${area.widthMeters.toStringAsFixed(1)} m · Length ${area.lengthMeters.toStringAsFixed(1)} m',
+            style: t.bodyMedium,
+          ),
+          const SizedBox(height: MarioSpacing.xxs),
+          Text(
+            'Hit window ${area.hitZoneStartMeters.toStringAsFixed(1)} m - ${area.hitZoneEndMeters.toStringAsFixed(1)} m',
+            style: t.bodyMedium,
+          ),
+        ],
       ),
     );
   }

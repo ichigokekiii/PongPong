@@ -10,7 +10,8 @@ import 'features/multiplayer/multiplayer_session_controller.dart';
 import 'features/multiplayer/multiplayer_setup_screen.dart';
 import 'features/results/result_screen.dart';
 import 'features/safety/safety_screen.dart';
-import 'features/scan/scan_screen.dart';
+import 'features/scan/scanned_area_model.dart';
+import 'features/scan/spatial_scan_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'theme/mario_theme.dart';
 
@@ -119,14 +120,8 @@ class _PhonePongAppState extends State<PhonePongApp> {
             ),
           );
         case Routes.calibration:
-          final sessionController =
-              settings.arguments is MultiplayerSessionController
-                  ? settings.arguments as MultiplayerSessionController
-                  : null;
-          return CalibrationScreen(
-            a11y: _a11y,
-            sessionController: sessionController,
-          );
+          final args = settings.arguments as ScannedAreaModel?;
+          return CalibrationScreen(a11y: _a11y, playArea: args);
         case Routes.game:
           final sessionController =
               settings.arguments is MultiplayerSessionController

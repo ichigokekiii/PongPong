@@ -1,91 +1,47 @@
-enum ScanStep { leftBoundary, rightBoundary, forwardLength, confirm }
-
 class ScannedAreaModel {
   const ScannedAreaModel({
-    required this.leftReachMeters,
-    required this.rightReachMeters,
+    required this.widthMeters,
     required this.lengthMeters,
+    required this.leftBoundaryCaptured,
+    required this.rightBoundaryCaptured,
+    required this.lengthCaptured,
   });
 
-  final double leftReachMeters;
-  final double rightReachMeters;
+  final double widthMeters;
   final double lengthMeters;
+  final bool leftBoundaryCaptured;
+  final bool rightBoundaryCaptured;
+  final bool lengthCaptured;
 
-  double get widthMeters => leftReachMeters + rightReachMeters;
-  double get playAreaSizeSquareMeters => widthMeters * lengthMeters;
+  bool get isReady =>
+      leftBoundaryCaptured && rightBoundaryCaptured && lengthCaptured;
+
+  double get nearZoneMeters => _roundToTenth((lengthMeters * 0.35).clamp(0.8, 1.4));
+  double get hitZoneStartMeters =>
+      _roundToTenth((lengthMeters * 0.45).clamp(1.0, 1.8));
+  double get hitZoneEndMeters =>
+      _roundToTenth((lengthMeters * 0.62).clamp(1.5, lengthMeters - 0.2));
+  double get farZoneStartMeters =>
+      _roundToTenth((lengthMeters * 0.75).clamp(1.8, lengthMeters));
 
   ScannedAreaModel copyWith({
-    double? leftReachMeters,
-    double? rightReachMeters,
+    double? widthMeters,
     double? lengthMeters,
+    bool? leftBoundaryCaptured,
+    bool? rightBoundaryCaptured,
+    bool? lengthCaptured,
   }) {
     return ScannedAreaModel(
-      leftReachMeters: leftReachMeters ?? this.leftReachMeters,
-      rightReachMeters: rightReachMeters ?? this.rightReachMeters,
+      widthMeters: widthMeters ?? this.widthMeters,
       lengthMeters: lengthMeters ?? this.lengthMeters,
+      leftBoundaryCaptured:
+          leftBoundaryCaptured ?? this.leftBoundaryCaptured,
+      rightBoundaryCaptured:
+          rightBoundaryCaptured ?? this.rightBoundaryCaptured,
+      lengthCaptured: lengthCaptured ?? this.lengthCaptured,
     );
   }
 
-  Map<String, dynamic> toJson() {
-    return <String, dynamic>{
-      'leftReachMeters': leftReachMeters,
-      'rightReachMeters': rightReachMeters,
-      'lengthMeters': lengthMeters,
-    };
-  }
-
-  factory ScannedAreaModel.fromJson(Map<String, dynamic> json) {
-    return ScannedAreaModel(
-      leftReachMeters: (json['leftReachMeters'] as num?)?.toDouble() ?? 1.2,
-      rightReachMeters: (json['rightReachMeters'] as num?)?.toDouble() ?? 1.3,
-      lengthMeters: (json['lengthMeters'] as num?)?.toDouble() ?? 3.0,
-    );
-  }
-}
-
-extension ScanStepPresentation on ScanStep {
-  String get subtitle {
-    switch (this) {
-      case ScanStep.leftBoundary:
-        return 'Mark the left edge of the rally zone.';
-      case ScanStep.rightBoundary:
-        return 'Capture the right edge to finish the width scan.';
-      case ScanStep.forwardLength:
-        return 'Measure the forward depth of the play area.';
-      case ScanStep.confirm:
-        return 'Review the generated court before calibration.';
-    }
-  }
-
-  String get progressLabel {
-    switch (this) {
-      case ScanStep.leftBoundary:
-      case ScanStep.rightBoundary:
-        return 'Scanning width...';
-      case ScanStep.forwardLength:
-        return 'Scanning length...';
-      case ScanStep.confirm:
-        return 'Play area ready';
-    }
-  }
-
-  String get previewLabel {
-    switch (this) {
-      case ScanStep.leftBoundary:
-        return 'Scanning width: left boundary';
-      case ScanStep.rightBoundary:
-        return 'Scanning width: right boundary';
-      case ScanStep.forwardLength:
-        return 'Scanning length: forward boundary';
-      case ScanStep.confirm:
-        return 'Play area ready';
-    }
-  }
-
-  static ScanStep fromName(String value) {
-    return ScanStep.values.firstWhere(
-      (step) => step.name == value,
-      orElse: () => ScanStep.leftBoundary,
-    );
-  }
+  static double _roundToTenth(double value) =>
+      (value * 10).roundToDouble() / 10;
 }
