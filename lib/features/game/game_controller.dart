@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../scan/scanned_area_model.dart';
+import 'game_audio_service.dart';
 import 'models/game_state_models.dart';
 
 /// Reactive game state holder.
@@ -12,7 +14,12 @@ import 'models/game_state_models.dart';
 /// Stub methods used by the DEMO CONTROLS sheet on [GameScreen] simulate
 /// real sensor / ball-logic input so reviewers can see every visual state.
 class GameController {
-  GameController();
+  GameController({this.playArea}) {
+    _refreshApproachFeedback(immediate: true);
+  }
+
+  final GameAudioService _audio = GameAudioService();
+  final ScannedAreaModel? playArea;
 
   // --- Reactive signals -----------------------------------------------------
   final ValueNotifier<BallState> ballState = ValueNotifier(BallState.far);
@@ -34,16 +41,25 @@ class GameController {
     // Not used yet — kept so the demo controls can call into the same surface.
   }
 
-  /// TODO(member-4): trigger audio + haptics via core/audio + core/haptics.
   void _emitFeedback(SwingEvent event) {
-    // Placeholder. Member 4 wires AudioService.play(event) here.
+    _audio.playEvent(event, speed.value);
   }
 
   // --- Mock state transitions for the demo sheet ----------------------------
 
-  void setBallState(BallState s) => ballState.value = s;
+  void setBallState(BallState s) {
+    if (ballState.value == s) return;
+    ballState.value = s;
+    _refreshApproachFeedback(immediate: true);
+  }
+
   void setBallEdge(BallEdge e) => ballEdge.value = e;
-  void setSpeed(BallSpeed s) => speed.value = s;
+
+  void setSpeed(BallSpeed s) {
+    if (speed.value == s) return;
+    speed.value = s;
+    _refreshApproachFeedback(immediate: true);
+  }
 
   void registerHit() {
     score.value += 1;
@@ -65,6 +81,7 @@ class GameController {
     longestRally.value =
         rally.value > longestRally.value ? rally.value : longestRally.value;
     speed.value = BallSpeed.urgent;
+    _refreshApproachFeedback(immediate: true);
     _setEvent(SwingEvent.smash);
     _emitFeedback(SwingEvent.smash);
   }
@@ -84,13 +101,30 @@ class GameController {
     });
   }
 
-  void pause() => status.value = GameStatus.paused;
-  void resume() => status.value = GameStatus.playing;
+  void pause() {
+    status.value = GameStatus.paused;
+    _refreshApproachFeedback();
+  }
+
+  void resume() {
+    status.value = GameStatus.playing;
+    _refreshApproachFeedback(immediate: true);
+  }
+
+  void _refreshApproachFeedback({bool immediate = false}) {
+    _audio.configureApproach(
+      state: ballState.value,
+      speed: speed.value,
+      status: status.value,
+      immediate: immediate,
+    );
+  }
 
   /// Computed: hits / attempts as a 0..1 accuracy ratio.
   double get accuracy => attempts.value == 0 ? 0 : hits.value / attempts.value;
 
   void dispose() {
+    _audio.dispose();
     ballState.dispose();
     ballEdge.dispose();
     speed.dispose();
